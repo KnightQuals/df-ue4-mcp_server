@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# References:
+- Official Python SDK for MCP: https://github.com/modelcontextprotocol/python-sdk
+
+# Code style and guides:
+
+- We are using `uv` to manage packages and run our [unreal_mcp_server.py](mdc:UNREAL/Python/unreal_mcp_server.py)
+- For mcp.tools(), do not use `Optional` as it is not supported by most MCP clients. Instead, use the default to None pattern and deal with defaults within the method definition itself.
+- Add docstring to methods defined.
