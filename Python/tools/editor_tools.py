@@ -57,41 +57,5 @@ def register_editor_tools(mcp: FastMCP):
             logger.error(f"Error focusing viewport: {e}")
             return {"status": "error", "message": str(e)}
     
-    @mcp.tool()
-    def take_screenshot(
-        ctx: Context,
-        filename: str = "screenshot.png",
-        show_ui: bool = False,
-        resolution: List[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Capture a screenshot of the viewport.
-        
-        Args:
-            filename: Name of the file to save the screenshot as
-            show_ui: Whether to include UI elements in the screenshot
-            resolution: Optional [Width, Height] for the screenshot
-            
-        Returns:
-            Response from Unreal Engine
-        """
-        from unreal_mcp_server import get_unreal_connection
-        
-        try:
-            params = {
-                "filename": filename,
-                "show_ui": show_ui
-            }
-            
-            if resolution:
-                params["resolution"] = resolution
-                
-            unity = get_unreal_connection()
-            response = unity.send_command("take_screenshot", params)
-            return response or {}
-            
-        except Exception as e:
-            logger.error(f"Error taking screenshot: {e}")
-            return {"status": "error", "message": str(e)}
 
     logger.info("Editor tools registered successfully")

@@ -11,6 +11,10 @@
 #include "UnrealMCPBridge.generated.h"
 
 class FMCPServerRunnable;
+class FUnrealMCPActorCommands;
+class FUnrealMCPEditorCommands;
+class FUnrealMCPBlueprintCommands;
+class FUnrealMCPBlueprintNodeCommands;
 
 // Forward declarations for Blueprint API classes
 class UEdGraph;
@@ -67,6 +71,12 @@ private:
 	FIPv4Address ServerAddress;
 	uint16 Port;
 
+	// Command handler instances
+	TSharedPtr<FUnrealMCPActorCommands> ActorCommands;
+	TSharedPtr<FUnrealMCPEditorCommands> EditorCommands;
+	TSharedPtr<FUnrealMCPBlueprintCommands> BlueprintCommands;
+	TSharedPtr<FUnrealMCPBlueprintNodeCommands> BlueprintNodeCommands;
+
 	// Command handlers
 	TSharedPtr<FJsonObject> HandleLevelCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> HandleAssetCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
@@ -80,6 +90,14 @@ private:
     TSharedPtr<FJsonObject> HandleSetBlueprintProperty(const TSharedPtr<FJsonObject>& RequestObj);
     TSharedPtr<FJsonObject> HandleAddBlueprintSelfReference(const TSharedPtr<FJsonObject>& RequestObj);
     TSharedPtr<FJsonObject> HandleFindBlueprintNodes(const TSharedPtr<FJsonObject>& RequestObj);
+    TSharedPtr<FJsonObject> HandleSetStaticMeshPropertiesCommand(const TSharedPtr<FJsonObject>& RequestObj);
+    
+    // Blueprint component functions
+    UBlueprint* FindBlueprintByName(const FString& BlueprintName);
+    TSharedPtr<FJsonObject> AddComponentToBlueprint(const FString& BlueprintName, const FString& ComponentType, 
+                                                   const FString& ComponentName, const FString& MeshType,
+                                                   const TArray<float>& Location, const TArray<float>& Rotation,
+                                                   const TArray<float>& Scale, const TSharedPtr<FJsonObject>& ComponentProperties);
     
     // Helper functions for blueprint node operations
     UBlueprint* FindBlueprint(const FString& BlueprintName);

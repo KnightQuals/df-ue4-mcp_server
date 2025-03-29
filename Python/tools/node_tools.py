@@ -18,15 +18,15 @@ def register_blueprint_node_tools(mcp: FastMCP):
     def add_blueprint_event_node(
         ctx: Context,
         blueprint_name: str,
-        event_type: str,
-        node_position: list[int] | None = None
+        event_name: str,
+        node_position = None
     ) -> Dict[str, Any]:
         """
         Add an event node to a Blueprint's event graph.
         
         Args:
             blueprint_name: Name of the target Blueprint
-            event_type: Type of event (BeginPlay, Tick, etc.)
+            event_name: Name of the event (BeginPlay, Tick, etc.)
             node_position: Optional [X, Y] position in the graph
             
         Returns:
@@ -35,10 +35,14 @@ def register_blueprint_node_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
+            # Handle default value within the method body
+            if node_position is None:
+                node_position = [0, 0]
+            
             params = {
                 "blueprint_name": blueprint_name,
-                "event_type": event_type,
-                "node_position": node_position or [0, 0]
+                "event_name": event_name,
+                "node_position": node_position
             }
             
             unreal = get_unreal_connection()
@@ -46,7 +50,7 @@ def register_blueprint_node_tools(mcp: FastMCP):
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
             
-            logger.info(f"Adding event node '{event_type}' to blueprint '{blueprint_name}'")
+            logger.info(f"Adding event node '{event_name}' to blueprint '{blueprint_name}'")
             response = unreal.send_command("add_blueprint_event_node", params)
             
             if not response:
@@ -66,7 +70,7 @@ def register_blueprint_node_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         action_name: str,
-        node_position: list[int] | None = None
+        node_position = None
     ) -> Dict[str, Any]:
         """
         Add an input action event node to a Blueprint's event graph.
@@ -82,10 +86,14 @@ def register_blueprint_node_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
+            # Handle default value within the method body
+            if node_position is None:
+                node_position = [0, 0]
+            
             params = {
                 "blueprint_name": blueprint_name,
                 "action_name": action_name,
-                "node_position": node_position or [0, 0]
+                "node_position": node_position
             }
             
             unreal = get_unreal_connection()
@@ -114,8 +122,8 @@ def register_blueprint_node_tools(mcp: FastMCP):
         blueprint_name: str,
         target: str,
         function_name: str,
-        params: Dict[str, Any] | None = None,
-        node_position: list[int] | None = None
+        params = None,
+        node_position = None
     ) -> Dict[str, Any]:
         """
         Add a function call node to a Blueprint's event graph.
@@ -133,12 +141,18 @@ def register_blueprint_node_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
+            # Handle default values within the method body
+            if params is None:
+                params = {}
+            if node_position is None:
+                node_position = [0, 0]
+            
             command_params = {
                 "blueprint_name": blueprint_name,
                 "target": target,
                 "function_name": function_name,
-                "params": params or {},
-                "node_position": node_position or [0, 0]
+                "params": params,
+                "node_position": node_position
             }
             
             unreal = get_unreal_connection()

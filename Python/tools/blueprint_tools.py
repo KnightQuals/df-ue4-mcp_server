@@ -53,11 +53,26 @@ def register_blueprint_tools(mcp: FastMCP):
         blueprint_name: str,
         component_type: str,
         component_name: str,
-        location: List[float] = None,
-        rotation: List[float] = None,
-        scale: List[float] = None
+        location: List[float] = [],
+        rotation: List[float] = [],
+        scale: List[float] = [],
+        component_properties: Dict[str, Any] = {}
     ) -> Dict[str, Any]:
-        """Add a component to a Blueprint."""
+        """
+        Add a component to a Blueprint.
+        
+        Args:
+            blueprint_name: Name of the target Blueprint
+            component_type: Type of component to add (use component class name without U prefix)
+            component_name: Name for the new component
+            location: [X, Y, Z] coordinates for component's position
+            rotation: [Pitch, Yaw, Roll] values for component's rotation
+            scale: [X, Y, Z] values for component's scale
+            component_properties: Additional properties to set on the component
+        
+        Returns:
+            Information about the added component
+        """
         from unreal_mcp_server import get_unreal_connection
         
         try:
@@ -70,6 +85,10 @@ def register_blueprint_tools(mcp: FastMCP):
                 "rotation": rotation or [0.0, 0.0, 0.0],
                 "scale": scale or [1.0, 1.0, 1.0]
             }
+            
+            # Add component_properties if provided
+            if component_properties and len(component_properties) > 0:
+                params["component_properties"] = component_properties
             
             # Validate location, rotation, and scale formats
             for param_name in ["location", "rotation", "scale"]:
@@ -97,6 +116,53 @@ def register_blueprint_tools(mcp: FastMCP):
             
         except Exception as e:
             error_msg = f"Error adding component to blueprint: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def set_static_mesh_properties(
+        ctx: Context,
+        blueprint_name: str,
+        component_name: str,
+        static_mesh: str = "/Engine/BasicShapes/Cube.Cube"
+    ) -> Dict[str, Any]:
+        """
+        Set static mesh properties on a StaticMeshComponent.
+        
+        Args:
+            blueprint_name: Name of the target Blueprint
+            component_name: Name of the StaticMeshComponent
+            static_mesh: Path to the static mesh asset (e.g., "/Engine/BasicShapes/Cube.Cube")
+            
+        Returns:
+            Response indicating success or failure
+        """
+        from unreal_mcp_server import get_unreal_connection
+        
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            params = {
+                "blueprint_name": blueprint_name,
+                "component_name": component_name,
+                "static_mesh": static_mesh
+            }
+            
+            logger.info(f"Setting static mesh properties with params: {params}")
+            response = unreal.send_command("set_static_mesh_properties", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Set static mesh properties response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error setting static mesh properties: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
     
@@ -267,11 +333,11 @@ def register_blueprint_tools(mcp: FastMCP):
     def set_pawn_properties(
         ctx: Context,
         blueprint_name: str,
-        auto_possess_player: str = None,
-        use_controller_rotation_yaw: bool = None,
-        use_controller_rotation_pitch: bool = None,
-        use_controller_rotation_roll: bool = None,
-        can_be_damaged: bool = None
+        auto_possess_player: str = "",
+        use_controller_rotation_yaw: bool | None = None,
+        use_controller_rotation_pitch: bool | None = None,
+        use_controller_rotation_roll: bool | None = None,
+        can_be_damaged: bool | None = None
     ) -> Dict[str, Any]:
         """
         Set common Pawn properties on a Blueprint.
@@ -298,8 +364,10 @@ def register_blueprint_tools(mcp: FastMCP):
             
             # Define the properties to set
             properties = {}
-            if auto_possess_player is not None:
-                properties["AutoPossessPlayer"] = auto_possess_player
+            if auto_possess_player and auto_possess_player != "":
+                properties["auto_possess_player"] = auto_possess_player
+            
+            # Only include boolean properties if they were explicitly set
             if use_controller_rotation_yaw is not None:
                 properties["bUseControllerRotationYaw"] = use_controller_rotation_yaw
             if use_controller_rotation_pitch is not None:
@@ -353,9 +421,9 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         actor_name: str,
-        location: List[float] = None,
-        rotation: List[float] = None,
-        scale: List[float] = None
+        location: List[float] = [],
+        rotation: List[float] = [],
+        scale: List[float] = []
     ) -> Dict[str, Any]:
         """Spawn an actor from a Blueprint."""
         from unreal_mcp_server import get_unreal_connection

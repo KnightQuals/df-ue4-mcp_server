@@ -4,15 +4,31 @@ This document provides detailed information about the actor tools available in t
 
 ## Overview
 
-Editor tools allow you to...
+Actor tools allow you to manipulate actors in the Unreal Engine scene.
 
 ## Actor Tools
 
-Tools for manipulating actors in the Unreal Engine scene.
+### get_actors_in_level
+
+Get a list of all actors in the current level.
+
+**Parameters:**
+- None
+
+**Returns:**
+- List of all actors with their properties
+
+**Example:**
+```json
+{
+  "command": "get_actors_in_level",
+  "params": {}
+}
+```
 
 ### find_actors_by_name
 
-Find actors in the current level by name.
+Find actors in the current level by name pattern.
 
 **Parameters:**
 - `pattern` (string) - The name or partial name pattern to search for
@@ -35,11 +51,11 @@ Find actors in the current level by name.
 Create a new actor in the current level.
 
 **Parameters:**
-- `name` (string) - The name for the new actor
-- `type` (string) - The type of actor to create (e.g., "CUBE", "SPHERE", "POINT_LIGHT")
-- `location` (array, optional) - [X, Y, Z] coordinates for the actor's position
-- `rotation` (array, optional) - [Pitch, Yaw, Roll] values for the actor's rotation
-- `scale` (array, optional) - [X, Y, Z] values for the actor's scale
+- `name` (string) - The name for the new actor (must be unique)
+- `type` (string) - The type of actor to create (must be uppercase)
+- `location` (array, optional) - [X, Y, Z] coordinates for the actor's position, defaults to [0, 0, 0]
+- `rotation` (array, optional) - [Pitch, Yaw, Roll] values for the actor's rotation, defaults to [0, 0, 0]
+- `scale` (array, optional) - [X, Y, Z] values for the actor's scale, defaults to [1, 1, 1]
 
 **Returns:**
 - Information about the created actor
@@ -123,35 +139,23 @@ Get all properties of an actor.
 }
 ```
 
-### get_actors_in_level
-
-Get a list of all actors in the current level.
-
-**Parameters:**
-- None
-
-**Returns:**
-- List of all actors with their properties
-
-**Example:**
-```json
-{
-  "command": "get_actors_in_level",
-  "params": {}
-}
-```
-
 ## Error Handling
 
-All command responses include a "success" field indicating whether the operation succeeded, and an optional "error" field with details in case of failure.
+All command responses include a "success" field indicating whether the operation succeeded, and an optional "message" field with details in case of failure.
 
 ```json
 {
   "success": false,
-  "error": "Actor 'MyCube' not found in the current level",
-  "command": "get_actor_properties"
+  "message": "Actor 'MyCube' not found in the current level"
 }
 ```
+
+## Implementation Notes
+
+- All numeric parameters for transforms (location, rotation, scale) must be provided as lists of 3 float values
+- Actor types should be provided in uppercase
+- The server maintains logging of all operations with detailed information and error messages
+- All commands are executed through a connection to the Unreal Engine editor
 
 ## Type Reference
 

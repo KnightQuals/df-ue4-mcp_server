@@ -4,6 +4,5 @@ Welcome to the documentation for the Unreal Engine Model Context Protocol (MCP) 
 
 ## Contents
 
-- [Unreal Plugin Implementation](Plugin/README.md) - All about how the Plugin is implemented in C++ .
 - [Tools](Tools/README.md) - All the tools that are available.
 

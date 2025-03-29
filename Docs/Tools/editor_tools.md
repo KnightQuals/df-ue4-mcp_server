@@ -4,7 +4,7 @@ This document provides detailed information about the editor tools available in 
 
 ## Overview
 
-Editor tools allow you to control the Unreal Editor viewport and other editor functionality through MCP commands. These tools are particularly useful for automating tasks like focusing the camera on specific actors or taking screenshots of your scene.
+Editor tools allow you to control the Unreal Editor viewport and other editor functionality through MCP commands. These tools are particularly useful for automating tasks like focusing the camera on specific actors or locations.
 
 ## Editor Tools
 
@@ -19,7 +19,7 @@ Focus the viewport on a specific actor or location.
 - `orientation` (array, optional) - [Pitch, Yaw, Roll] for the viewport camera
 
 **Returns:**
-- Result of the focus operation
+- Response from Unreal Engine containing the result of the focus operation
 
 **Example:**
 ```json
@@ -59,7 +59,7 @@ Capture a screenshot of the viewport.
 
 ## Error Handling
 
-All command responses include a "success" field indicating whether the operation succeeded, and an optional "message" field with details in case of failure.
+All command responses include a "status" field indicating whether the operation succeeded, and an optional "message" field with details in case of failure.
 
 ```json
 {
@@ -79,7 +79,11 @@ from unreal_mcp_server import get_unreal_connection
 unreal = get_unreal_connection()
 
 # Focus on a specific actor
-focus_response = unreal.send_command("focus_viewport", {"target": "PlayerStart"})
+focus_response = unreal.send_command("focus_viewport", {
+    "target": "PlayerStart",
+    "distance": 500,
+    "orientation": [0, 180, 0]
+})
 print(focus_response)
 
 # Take a screenshot
@@ -91,7 +95,7 @@ print(screenshot_response)
 
 - **Command fails with "Failed to get active viewport"**: Make sure Unreal Editor is running and has an active viewport.
 - **Actor not found**: Verify that the actor name is correct and the actor exists in the current level.
-- **Screenshot not saving**: Check that the specified directory exists and has write permissions.
+- **Invalid parameters**: Ensure that location and orientation arrays contain exactly 3 values (X, Y, Z for location; Pitch, Yaw, Roll for orientation).
 
 ## Future Enhancements
 

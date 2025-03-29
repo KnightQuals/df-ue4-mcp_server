@@ -4,7 +4,7 @@
       "command": "uv",
       "args": [
         "--directory",
-        "C:/Users/chong-u/Personal/unreal-mcp/UNREAL/Python",
+        "absolute/path/to/this/repository/Python",
         "run",
         "unreal_mcp_server.py"
       ]

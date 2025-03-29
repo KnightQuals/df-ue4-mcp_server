@@ -30,13 +30,13 @@ def register_actor_tools(mcp: FastMCP):
             # Log the complete response for debugging
             logger.info(f"Complete response from Unreal: {response}")
             
-            # Check for both possible response formats
-            if "result" in response and "content" in response["result"]:
-                actors = response["result"]["content"]
+            # Check response format
+            if "result" in response and "actors" in response["result"]:
+                actors = response["result"]["actors"]
                 logger.info(f"Found {len(actors)} actors in level")
                 return actors
-            elif "content" in response:
-                actors = response["content"]
+            elif "actors" in response:
+                actors = response["actors"]
                 logger.info(f"Found {len(actors)} actors in level")
                 return actors
                 
@@ -72,11 +72,23 @@ def register_actor_tools(mcp: FastMCP):
         ctx: Context,
         name: str,
         type: str,
-        location: List[float] = None,
-        rotation: List[float] = None,
-        scale: List[float] = None
+        location: List[float] = [0.0, 0.0, 0.0],
+        rotation: List[float] = [0.0, 0.0, 0.0],
+        scale: List[float] = [1.0, 1.0, 1.0]
     ) -> Dict[str, Any]:
-        """Create a new actor in the current level."""
+        """Create a new actor in the current level.
+        
+        Args:
+            ctx: The MCP context
+            name: The name to give the new actor (must be unique)
+            type: The type of actor to create (e.g. StaticMeshActor, PointLight)
+            location: The [x, y, z] world location to spawn at
+            rotation: The [pitch, yaw, roll] rotation in degrees
+            scale: The [x, y, z] scale to apply
+            
+        Returns:
+            Dict containing the created actor's properties
+        """
         from unreal_mcp_server import get_unreal_connection
         
         try:
@@ -86,9 +98,9 @@ def register_actor_tools(mcp: FastMCP):
             params = {
                 "name": name,
                 "type": type.upper(),  # Make sure type is uppercase
-                "location": location or [0.0, 0.0, 0.0],  # Provide default values
-                "rotation": rotation or [0.0, 0.0, 0.0],
-                "scale": scale or [1.0, 1.0, 1.0]
+                "location": location,
+                "rotation": rotation,
+                "scale": scale
             }
             
             # Validate location, rotation, and scale formats
@@ -109,6 +121,12 @@ def register_actor_tools(mcp: FastMCP):
             
             # Log the complete response for debugging
             logger.info(f"Actor creation response: {response}")
+            
+            # Handle error responses correctly
+            if response.get("status") == "error":
+                error_message = response.get("error", "Unknown error")
+                logger.error(f"Error creating actor: {error_message}")
+                return {"success": False, "message": error_message}
             
             return response
             

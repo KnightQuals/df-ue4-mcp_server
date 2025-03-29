@@ -158,10 +158,22 @@ class UnrealConnection:
             # Log complete response for debugging
             logger.info(f"Complete response from Unreal: {response}")
             
+            # Check for both error formats: {"status": "error", ...} and {"success": false, ...}
             if response.get("status") == "error":
                 error_message = response.get("error") or response.get("message", "Unknown Unreal error")
-                logger.error(f"Unreal error: {error_message}")
-                raise Exception(error_message)
+                logger.error(f"Unreal error (status=error): {error_message}")
+                # We want to preserve the original error structure but ensure error is accessible
+                if "error" not in response:
+                    response["error"] = error_message
+            elif response.get("success") is False:
+                # This format uses {"success": false, "error": "message"} or {"success": false, "message": "message"}
+                error_message = response.get("error") or response.get("message", "Unknown Unreal error")
+                logger.error(f"Unreal error (success=false): {error_message}")
+                # Convert to the standard format expected by higher layers
+                response = {
+                    "status": "error",
+                    "error": error_message
+                }
             
             # Always close the connection after command is complete
             # since Unreal will close it on its side anyway
@@ -183,7 +195,10 @@ class UnrealConnection:
             except:
                 pass
             self.socket = None
-            return None
+            return {
+                "status": "error",
+                "error": str(e)
+            }
 
 # Global connection state
 _unreal_connection: UnrealConnection = None
@@ -276,13 +291,67 @@ def unreal_best_practices():
     - `get_actor_properties(name)` - Get actor properties
     - `get_actors_in_level()` - Get all actors in the current level
     
+    ## Blueprint Management
+    - `create_blueprint(name, parent_class)` - Create new Blueprint classes
+    - `add_component_to_blueprint(blueprint_name, component_type, component_name, location, rotation, scale)` - Add components to Blueprints
+    - `set_component_property(blueprint_name, component_name, property_name, property_value)` - Set component properties
+    - `set_physics_properties(blueprint_name, component_name, simulate_physics, gravity_enabled, mass, linear_damping, angular_damping)` - Configure physics
+    - `compile_blueprint(blueprint_name)` - Compile Blueprint changes
+    - `set_blueprint_property(blueprint_name, property_name, property_value)` - Set Blueprint class properties
+    - `set_pawn_properties(blueprint_name, auto_possess_player, use_controller_rotation_yaw, use_controller_rotation_pitch, use_controller_rotation_roll, can_be_damaged)` - Configure Pawn settings
+    - `spawn_blueprint_actor(blueprint_name, actor_name, location, rotation, scale)` - Spawn Blueprint actors in the level
+    
+    ## Blueprint Node Management
+    - `add_blueprint_event_node(blueprint_name, event_type, node_position)` - Add event nodes (BeginPlay, Tick, etc.)
+    - `add_blueprint_input_action_node(blueprint_name, action_name, node_position)` - Add input action nodes
+    - `add_blueprint_function_node(blueprint_name, target, function_name, params, node_position)` - Add function call nodes
+    - `connect_blueprint_nodes(blueprint_name, source_node_id, source_pin, target_node_id, target_pin)` - Connect nodes
+    - `add_blueprint_variable(blueprint_name, variable_name, variable_type, default_value, is_exposed)` - Add variables
+    - `create_input_mapping(action_name, key, input_type)` - Create input mappings
+    - `add_blueprint_get_self_component_reference(blueprint_name, component_name, node_position)` - Add component references
+    - `add_blueprint_self_reference(blueprint_name, node_position)` - Add self references
+    - `find_blueprint_nodes(blueprint_name, node_type, event_type)` - Find nodes in Blueprint graphs
+    
+    ## Editor Tools
+    - `focus_viewport(target, location, distance, orientation)` - Focus viewport on actors or locations
+    - `take_screenshot(filename, show_ui, resolution)` - Capture viewport screenshots
+    
     ## Best Practices
+    ### Actor Creation and Management
     - When creating actors, always provide a unique name to avoid conflicts
     - Valid actor types include: CUBE, SPHERE, PLANE, CYLINDER, CONE, CAMERA, LIGHT, POINT_LIGHT, SPOT_LIGHT
     - Location is specified as [x, y, z] in Unreal units
     - Rotation is specified as [pitch, yaw, roll] in degrees
     - Scale is specified as [x, y, z] multipliers (1.0 is default scale)
     - Always clean up temporary actors when no longer needed
+    
+    ### Blueprint Development
+    - Always compile Blueprints after making changes
+    - Use meaningful names for variables and functions
+    - Organize nodes in the graph for better readability
+    - Test Blueprint functionality in a controlled environment
+    - Use proper variable types for different data needs
+    - Consider performance implications when adding nodes
+    
+    ### Node Graph Management
+    - Position nodes logically to maintain graph readability
+    - Use appropriate node types for different operations
+    - Connect nodes with proper pin types
+    - Document complex node setups with comments
+    - Test node connections before finalizing
+    
+    ### Input Mapping
+    - Use descriptive names for input actions
+    - Consider platform-specific input needs
+    - Test input mappings thoroughly
+    - Document input bindings for team reference
+    
+    ### Error Handling
+    - Always check command responses for success status
+    - Handle error cases gracefully
+    - Log important operations and errors
+    - Validate parameters before sending commands
+    - Clean up resources in error cases
     """
 
 # Run the server

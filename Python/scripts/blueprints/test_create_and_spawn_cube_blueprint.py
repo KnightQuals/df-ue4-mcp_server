@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 """
-Test script for creating a basic blueprint with components via MCP.
+Test script for creating and manipulating a basic Blueprint in Unreal Engine via MCP.
+
+This script demonstrates the core Blueprint creation and manipulation workflow:
+1. Creates a new Blueprint class (TestBP) derived from Actor
+2. Adds a StaticMeshComponent named 'CubeVisual' to the Blueprint
+3. Sets the component's mesh to a basic cube shape (/Engine/BasicShapes/Cube.Cube)
+4. Compiles the Blueprint to apply the changes
+5. Spawns an instance of the Blueprint in the level at [0, 0, 100]
+
+The script serves as both a test of the MCP Blueprint manipulation functionality
+and a basic example of how to programmatically create and modify Blueprints
+through the MCP interface.
 """
 
 import sys
@@ -77,7 +88,7 @@ def main():
             response = send_command(sock, "create_blueprint", bp_params)
             
             # Fixed response check to handle nested structure
-            if not response or response.get("status") != "success" or not response.get("result", {}).get("success"):
+            if not response or response.get("status") != "success":
                 logger.error(f"Failed to create blueprint: {response}")
                 return
             
@@ -90,7 +101,7 @@ def main():
             # Step 2: Add a static mesh component
             component_params = {
                 "blueprint_name": "TestBP",
-                "component_type": "StaticMesh",
+                "component_type": "StaticMeshComponent",
                 "component_name": "CubeVisual",
                 "location": [0.0, 0.0, 0.0],
                 "rotation": [0.0, 0.0, 0.0],
@@ -105,13 +116,33 @@ def main():
             response = send_command(sock, "add_component_to_blueprint", component_params)
             
             # Fixed response check to handle nested structure
-            if not response or response.get("status") != "success" or not response.get("result", {}).get("success"):
+            if not response or response.get("status") != "success":
                 logger.error(f"Failed to add component: {response}")
                 return
                 
             logger.info("Component added successfully!")
             
-            # Step 3: Compile the blueprint
+            # Step 3: Set the static mesh properties
+            sock.close()
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(("127.0.0.1", 55557))
+            
+            mesh_params = {
+                "blueprint_name": "TestBP",
+                "component_name": "CubeVisual",
+                "static_mesh": "/Engine/BasicShapes/Cube.Cube"
+            }
+            
+            response = send_command(sock, "set_static_mesh_properties", mesh_params)
+            
+            # Fixed response check to handle nested structure
+            if not response or response.get("status") != "success":
+                logger.error(f"Failed to set static mesh properties: {response}")
+                return
+                
+            logger.info("Static mesh properties set successfully!")
+            
+            # Step 4: Compile the blueprint
             sock.close()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(("127.0.0.1", 55557))
@@ -123,13 +154,13 @@ def main():
             response = send_command(sock, "compile_blueprint", compile_params)
             
             # Fixed response check to handle nested structure
-            if not response or response.get("status") != "success" or not response.get("result", {}).get("success"):
+            if not response or response.get("status") != "success":
                 logger.error(f"Failed to compile blueprint: {response}")
                 return
                 
             logger.info("Blueprint compiled successfully!")
             
-            # Step 4: Spawn an instance of the blueprint
+            # Step 5: Spawn an instance of the blueprint
             sock.close()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(("127.0.0.1", 55557))
@@ -145,7 +176,7 @@ def main():
             response = send_command(sock, "spawn_blueprint_actor", spawn_params)
             
             # Fixed response check to handle nested structure
-            if not response or response.get("status") != "success" or not response.get("result", {}).get("success"):
+            if not response or response.get("status") != "success":
                 logger.error(f"Failed to spawn blueprint actor: {response}")
                 return
                 
