@@ -239,7 +239,7 @@ def get_unreal_connection() -> Optional[UnrealConnection]:
 async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     """Handle server startup and shutdown."""
     global _unreal_connection
-    logger.info("UnityMCP server starting up")
+    logger.info("UnrealMCP server starting up")
     try:
         _unreal_connection = get_unreal_connection()
         if _unreal_connection:

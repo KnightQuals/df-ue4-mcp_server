@@ -49,8 +49,8 @@ def register_editor_tools(mcp: FastMCP):
             if orientation:
                 params["orientation"] = orientation
                 
-            unity = get_unreal_connection()
-            response = unity.send_command("focus_viewport", params)
+            unreal = get_unreal_connection()
+            response = unreal.send_command("focus_viewport", params)
             return response or {}
             
         except Exception as e:

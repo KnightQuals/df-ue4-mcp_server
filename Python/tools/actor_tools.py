@@ -20,8 +20,8 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
-            response = unity.send_command("get_actors_in_level", {})
+            unreal = get_unreal_connection()
+            response = unreal.send_command("get_actors_in_level", {})
             
             if not response:
                 logger.warning("No response from Unreal Engine")
@@ -53,8 +53,8 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
-            response = unity.send_command("find_actors_by_name", {
+            unreal = get_unreal_connection()
+            response = unreal.send_command("find_actors_by_name", {
                 "pattern": pattern
             })
             
@@ -92,7 +92,7 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
+            unreal = get_unreal_connection()
             
             # Ensure all parameters are properly formatted
             params = {
@@ -113,7 +113,7 @@ def register_actor_tools(mcp: FastMCP):
                 params[param_name] = [float(val) for val in param_value]
             
             logger.info(f"Creating actor '{name}' of type '{type}' with params: {params}")
-            response = unity.send_command("create_actor", params)
+            response = unreal.send_command("create_actor", params)
             
             if not response:
                 logger.error("No response from Unreal Engine")
@@ -141,8 +141,8 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
-            response = unity.send_command("delete_actor", {
+            unreal = get_unreal_connection()
+            response = unreal.send_command("delete_actor", {
                 "name": name
             })
             return response or {}
@@ -163,7 +163,7 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
+            unreal = get_unreal_connection()
             params = {"name": name}
             if location is not None:
                 params["location"] = location
@@ -172,7 +172,7 @@ def register_actor_tools(mcp: FastMCP):
             if scale is not None:
                 params["scale"] = scale
                 
-            response = unity.send_command("set_actor_transform", params)
+            response = unreal.send_command("set_actor_transform", params)
             return response or {}
             
         except Exception as e:
@@ -185,8 +185,8 @@ def register_actor_tools(mcp: FastMCP):
         from unreal_mcp_server import get_unreal_connection
         
         try:
-            unity = get_unreal_connection()
-            response = unity.send_command("get_actor_properties", {
+            unreal = get_unreal_connection()
+            response = unreal.send_command("get_actor_properties", {
                 "name": name
             })
             return response or {}
