@@ -18,7 +18,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
         logging.FileHandler('unreal_mcp.log'),
-        logging.StreamHandler(sys.stdout)
+        # logging.StreamHandler(sys.stdout) # Remove this handler to unexpected non-whitespace characters in JSON
     ]
 )
 logger = logging.getLogger("UnrealMCP")
