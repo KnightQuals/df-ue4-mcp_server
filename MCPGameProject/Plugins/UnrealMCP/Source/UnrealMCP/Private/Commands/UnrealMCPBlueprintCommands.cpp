@@ -185,21 +185,35 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleAddComponentToBluepri
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
     }
 
-    // Create the component
+    // Create the component - dynamically find the component class by name
     UClass* ComponentClass = nullptr;
-    if (ComponentType == TEXT("StaticMeshComponent"))
+
+    // Try to find the class with exact name first
+    ComponentClass = FindObject<UClass>(ANY_PACKAGE, *ComponentType);
+    
+    // If not found, try with "Component" suffix
+    if (!ComponentClass && !ComponentType.EndsWith(TEXT("Component")))
     {
-        ComponentClass = UStaticMeshComponent::StaticClass();
+        FString ComponentTypeWithSuffix = ComponentType + TEXT("Component");
+        ComponentClass = FindObject<UClass>(ANY_PACKAGE, *ComponentTypeWithSuffix);
     }
-    else if (ComponentType == TEXT("BoxComponent"))
+    
+    // If still not found, try with "U" prefix
+    if (!ComponentClass && !ComponentType.StartsWith(TEXT("U")))
     {
-        ComponentClass = UBoxComponent::StaticClass();
+        FString ComponentTypeWithPrefix = TEXT("U") + ComponentType;
+        ComponentClass = FindObject<UClass>(ANY_PACKAGE, *ComponentTypeWithPrefix);
+        
+        // Try with both prefix and suffix
+        if (!ComponentClass && !ComponentType.EndsWith(TEXT("Component")))
+        {
+            FString ComponentTypeWithBoth = TEXT("U") + ComponentType + TEXT("Component");
+            ComponentClass = FindObject<UClass>(ANY_PACKAGE, *ComponentTypeWithBoth);
+        }
     }
-    else if (ComponentType == TEXT("SphereComponent"))
-    {
-        ComponentClass = USphereComponent::StaticClass();
-    }
-    else
+    
+    // Verify that the class is a valid component type
+    if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown component type: %s"), *ComponentType));
     }
