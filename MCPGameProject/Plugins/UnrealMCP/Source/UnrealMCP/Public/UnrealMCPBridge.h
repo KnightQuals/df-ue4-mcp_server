@@ -8,6 +8,11 @@
 #include "Json.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
+#include "GameFramework/Actor.h"
+#include "Commands/UnrealMCPEditorCommands.h"
+#include "Commands/UnrealMCPBlueprintCommands.h"
+#include "Commands/UnrealMCPBlueprintNodeCommands.h"
+#include "Commands/UnrealMCPProjectCommands.h"
 #include "UnrealMCPBridge.generated.h"
 
 class FMCPServerRunnable;
@@ -39,6 +44,9 @@ class UNREALMCP_API UUnrealMCPBridge : public UEditorSubsystem
 	GENERATED_BODY()
 
 public:
+	UUnrealMCPBridge();
+	virtual ~UUnrealMCPBridge();
+
 	// UEditorSubsystem implementation
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
@@ -73,7 +81,6 @@ private:
 	uint16 Port;
 
 	// Command handler instances
-	TSharedPtr<FUnrealMCPActorCommands> ActorCommands;
 	TSharedPtr<FUnrealMCPEditorCommands> EditorCommands;
 	TSharedPtr<FUnrealMCPBlueprintCommands> BlueprintCommands;
 	TSharedPtr<FUnrealMCPBlueprintNodeCommands> BlueprintNodeCommands;
