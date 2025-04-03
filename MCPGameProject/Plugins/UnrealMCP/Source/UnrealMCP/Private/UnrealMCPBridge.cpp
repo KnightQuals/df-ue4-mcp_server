@@ -243,7 +243,6 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
             }
             // Blueprint Node Commands
             else if (CommandType == TEXT("connect_blueprint_nodes") || 
-                     CommandType == TEXT("create_input_mapping") || 
                      CommandType == TEXT("add_blueprint_get_self_component_reference") ||
                      CommandType == TEXT("add_blueprint_self_reference") ||
                      CommandType == TEXT("find_blueprint_nodes") ||
@@ -254,6 +253,11 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("add_blueprint_variable"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
+            }
+            // Project Commands
+            else if (CommandType == TEXT("create_input_mapping"))
+            {
+                ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }
             else
             {
