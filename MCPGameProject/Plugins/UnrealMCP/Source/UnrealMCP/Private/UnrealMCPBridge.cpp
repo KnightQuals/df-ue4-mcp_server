@@ -56,6 +56,7 @@
 #include "Commands/UnrealMCPBlueprintNodeCommands.h"
 #include "Commands/UnrealMCPProjectCommands.h"
 #include "Commands/UnrealMCPCommonUtils.h"
+#include "Commands/UnrealMCPUMGCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -67,6 +68,7 @@ UUnrealMCPBridge::UUnrealMCPBridge()
     BlueprintCommands = MakeShared<FUnrealMCPBlueprintCommands>();
     BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
     ProjectCommands = MakeShared<FUnrealMCPProjectCommands>();
+    UMGCommands = MakeShared<FUnrealMCPUMGCommands>();
 }
 
 UUnrealMCPBridge::~UUnrealMCPBridge()
@@ -75,6 +77,7 @@ UUnrealMCPBridge::~UUnrealMCPBridge()
     BlueprintCommands.Reset();
     BlueprintNodeCommands.Reset();
     ProjectCommands.Reset();
+    UMGCommands.Reset();
 }
 
 // Initialize subsystem
@@ -263,6 +266,13 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
             else if (CommandType == TEXT("create_input_mapping"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
+            }
+            // UMG Commands
+            else if (CommandType == TEXT("create_umg_widget_blueprint") ||
+                     CommandType == TEXT("add_text_block_to_widget") ||
+                     CommandType == TEXT("add_widget_to_viewport"))
+            {
+                ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }
             else
             {

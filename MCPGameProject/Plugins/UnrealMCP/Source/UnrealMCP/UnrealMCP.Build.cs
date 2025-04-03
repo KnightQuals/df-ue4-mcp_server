@@ -35,29 +35,24 @@ public class UnrealMCP : ModuleRules
 				"Json",
 				"JsonUtilities",
 				"DeveloperSettings"
-				// ... add other public dependencies that you statically link with here ...
 			}
 		);
 		
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore",
 				"UnrealEd",
 				"EditorScriptingUtilities",
 				"EditorSubsystem",
+				"Slate",
+				"SlateCore",
+				"UMG",
+				"UMGEditor",
 				"Kismet",
 				"KismetCompiler",
 				"BlueprintGraph",
-				"GraphEditor",
-				"PropertyEditor",
 				"Projects",
-				"AssetRegistry",
-				"ContentBrowser"
-				// ... add private dependencies that you statically link with here ...	
+				"AssetRegistry"
 			}
 		);
 		
