@@ -26,9 +26,13 @@ TSharedPtr<FJsonObject> FUnrealMCPActorCommands::HandleCommand(const FString& Co
     {
         return HandleFindActorsByName(Params);
     }
-    else if (CommandType == TEXT("create_actor"))
+    else if (CommandType == TEXT("spawn_actor") || CommandType == TEXT("create_actor"))
     {
-        return HandleCreateActor(Params);
+        if (CommandType == TEXT("create_actor"))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("'create_actor' command is deprecated and will be removed in a future version. Please use 'spawn_actor' instead."));
+        }
+        return HandleSpawnActor(Params);
     }
     else if (CommandType == TEXT("delete_actor"))
     {
@@ -92,7 +96,7 @@ TSharedPtr<FJsonObject> FUnrealMCPActorCommands::HandleFindActorsByName(const TS
     return ResultObj;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPActorCommands::HandleCreateActor(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FUnrealMCPActorCommands::HandleSpawnActor(const TSharedPtr<FJsonObject>& Params)
 {
     // Get required parameters
     FString ActorType;

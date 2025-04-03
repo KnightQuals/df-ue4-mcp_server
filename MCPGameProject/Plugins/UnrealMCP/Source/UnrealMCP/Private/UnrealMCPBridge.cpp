@@ -215,7 +215,7 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
             // Actor Commands
             else if (CommandType == TEXT("get_actors_in_level") || 
                      CommandType == TEXT("find_actors_by_name") ||
-                     CommandType == TEXT("create_actor") || 
+                     CommandType == TEXT("spawn_actor") ||
                      CommandType == TEXT("delete_actor") || 
                      CommandType == TEXT("set_actor_transform") ||
                      CommandType == TEXT("get_actor_properties"))
