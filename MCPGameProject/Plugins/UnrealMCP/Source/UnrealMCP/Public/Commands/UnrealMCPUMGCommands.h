@@ -48,4 +48,35 @@ private:
      * @return JSON response with the widget instance details
      */
     TSharedPtr<FJsonObject> HandleAddWidgetToViewport(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Add a Button widget to a UMG Widget Blueprint
+     * @param Params - Must include:
+     *                "blueprint_name" - Name of the target Widget Blueprint
+     *                "widget_name" - Name for the new Button
+     *                "text" - Button text
+     *                "position" - [X, Y] position in the canvas
+     * @return JSON response with the added widget details
+     */
+    TSharedPtr<FJsonObject> HandleAddButtonToWidget(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Bind an event to a widget (e.g. button click)
+     * @param Params - Must include:
+     *                "blueprint_name" - Name of the target Widget Blueprint
+     *                "widget_name" - Name of the widget to bind
+     *                "event_name" - Name of the event to bind
+     * @return JSON response with the binding details
+     */
+    TSharedPtr<FJsonObject> HandleBindWidgetEvent(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Set up text block binding for dynamic updates
+     * @param Params - Must include:
+     *                "blueprint_name" - Name of the target Widget Blueprint
+     *                "widget_name" - Name of the widget to bind
+     *                "binding_name" - Name of the binding to set up
+     * @return JSON response with the binding details
+     */
+    TSharedPtr<FJsonObject> HandleSetTextBlockBinding(const TSharedPtr<FJsonObject>& Params);
 }; 

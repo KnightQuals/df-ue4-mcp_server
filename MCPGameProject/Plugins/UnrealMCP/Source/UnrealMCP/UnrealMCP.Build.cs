@@ -47,7 +47,6 @@ public class UnrealMCP : ModuleRules
 				"Slate",
 				"SlateCore",
 				"UMG",
-				"UMGEditor",
 				"Kismet",
 				"KismetCompiler",
 				"BlueprintGraph",
@@ -55,6 +54,19 @@ public class UnrealMCP : ModuleRules
 				"AssetRegistry"
 			}
 		);
+		
+		if (Target.bBuildEditor == true)
+		{
+			PrivateDependencyModuleNames.AddRange(
+				new string[]
+				{
+					"PropertyEditor",      // For widget property editing
+					"ToolMenus",           // For editor UI
+					"BlueprintEditorLibrary", // For Blueprint utilities
+					"UMGEditor"           // For WidgetBlueprint.h and other UMG editor functionality
+				}
+			);
+		}
 		
 		DynamicallyLoadedModuleNames.AddRange(
 			new string[]

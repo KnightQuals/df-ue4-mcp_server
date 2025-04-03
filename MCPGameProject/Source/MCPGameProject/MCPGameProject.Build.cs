@@ -13,16 +13,16 @@ public class MCPGameProject : ModuleRules
 			"CoreUObject", 
 			"Engine", 
 			"InputCore", 
-			"EnhancedInput"
+			"EnhancedInput",
+			"UMG"  // Add UMG for Widget Blueprints
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
-
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
-		// Uncomment if you are using online features
-		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"Slate",
+			"SlateCore",  // Required for UMG
+			// Uncomment if you are using online features
+			// "OnlineSubsystem"
+		});
 
 		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
 	}

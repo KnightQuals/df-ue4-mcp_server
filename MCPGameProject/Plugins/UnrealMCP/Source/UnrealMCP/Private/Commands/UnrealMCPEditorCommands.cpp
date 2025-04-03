@@ -489,7 +489,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleTakeScreenshot(const TSh
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'filepath' parameter"));
     }
-
+    
     // Ensure the file path has a proper extension
     if (!FilePath.EndsWith(TEXT(".png")))
     {

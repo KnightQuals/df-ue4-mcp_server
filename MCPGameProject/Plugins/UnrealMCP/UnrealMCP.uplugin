@@ -30,10 +30,6 @@
 		{
 			"Name": "EditorScriptingUtilities",
 			"Enabled": true
-		},
-		{
-			"Name": "UMG",
-			"Enabled": true
 		}
 	]
 } 
