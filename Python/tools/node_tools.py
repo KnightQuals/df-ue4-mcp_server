@@ -282,53 +282,6 @@ def register_blueprint_node_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
     
     @mcp.tool()
-    def create_input_mapping(
-        ctx: Context,
-        action_name: str,
-        key: str,
-        input_type: str = "Action"
-    ) -> Dict[str, Any]:
-        """
-        Create an input mapping for the project.
-        
-        Args:
-            action_name: Name of the input action
-            key: Key to bind (SpaceBar, LeftMouseButton, etc.)
-            input_type: Type of input mapping (Action or Axis)
-            
-        Returns:
-            Response indicating success or failure
-        """
-        from unreal_mcp_server import get_unreal_connection
-        
-        try:
-            params = {
-                "action_name": action_name,
-                "key": key,
-                "input_type": input_type
-            }
-            
-            unreal = get_unreal_connection()
-            if not unreal:
-                logger.error("Failed to connect to Unreal Engine")
-                return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
-            logger.info(f"Creating input mapping '{action_name}' with key '{key}'")
-            response = unreal.send_command("create_input_mapping", params)
-            
-            if not response:
-                logger.error("No response from Unreal Engine")
-                return {"success": False, "message": "No response from Unreal Engine"}
-            
-            logger.info(f"Input mapping creation response: {response}")
-            return response
-            
-        except Exception as e:
-            error_msg = f"Error creating input mapping: {e}"
-            logger.error(error_msg)
-            return {"success": False, "message": error_msg}
-    
-    @mcp.tool()
     def add_blueprint_get_self_component_reference(
         ctx: Context,
         blueprint_name: str,

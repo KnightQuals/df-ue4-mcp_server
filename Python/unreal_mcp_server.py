@@ -266,17 +266,17 @@ mcp = FastMCP(
 )
 
 # Import and register tools
-from tools.actor_tools import register_actor_tools
 from tools.editor_tools import register_editor_tools
 from tools.blueprint_tools import register_blueprint_tools
 from tools.node_tools import register_blueprint_node_tools
+from tools.project_tools import register_project_tools
 from tools.ui_tools import register_ui_tools  # New UI tools
 
 # Register tools
-register_actor_tools(mcp)
 register_editor_tools(mcp)
 register_blueprint_tools(mcp)
 register_blueprint_node_tools(mcp)
+register_project_tools(mcp)
 register_ui_tools(mcp)  # Register UI tools
 
 @mcp.prompt()
