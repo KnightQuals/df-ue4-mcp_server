@@ -287,7 +287,7 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         property_name: str,
-        property_value: object
+        property_value
     ) -> Dict[str, Any]:
         """
         Set a property on a Blueprint class default object.
@@ -334,10 +334,10 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         auto_possess_player: str = "",
-        use_controller_rotation_yaw: bool | None = None,
-        use_controller_rotation_pitch: bool | None = None,
-        use_controller_rotation_roll: bool | None = None,
-        can_be_damaged: bool | None = None
+        use_controller_rotation_yaw: bool = None,
+        use_controller_rotation_pitch: bool = None,
+        use_controller_rotation_roll: bool = None,
+        can_be_damaged: bool = None
     ) -> Dict[str, Any]:
         """
         Set common Pawn properties on a Blueprint.

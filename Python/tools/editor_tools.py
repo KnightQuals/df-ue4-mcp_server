@@ -221,10 +221,10 @@ def register_editor_tools(mcp: FastMCP):
     @mcp.tool()
     def focus_viewport(
         ctx: Context,
-        target: str | None = None,
-        location: List[float] | None = None,
+        target: str = None,
+        location: List[float] = None,
         distance: float = 1000.0,
-        orientation: List[float] | None = None
+        orientation: List[float] = None
     ) -> Dict[str, Any]:
         """
         Focus the viewport on a specific actor or location.
