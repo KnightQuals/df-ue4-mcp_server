@@ -309,49 +309,24 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetComponentProperty(
     // Handle different property types
     if (Params->HasField(TEXT("value")))
     {
-        FProperty* Property = ComponentTemplate->GetClass()->FindPropertyByName(*PropertyName);
-        if (!Property)
-        {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
-        }
-
-        // Set the property value based on its type
-        void* PropertyAddr = Property->ContainerPtrToValuePtr<void>(ComponentTemplate);
         TSharedPtr<FJsonValue> JsonValue = Params->Values.FindRef(TEXT("value"));
+        
+        FString ErrorMessage;
+        if (FUnrealMCPCommonUtils::SetObjectProperty(ComponentTemplate, PropertyName, JsonValue, ErrorMessage))
+        {
+            // Mark the blueprint as modified
+            FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
-        if (Property->IsA<FBoolProperty>())
-        {
-            ((FBoolProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsBool());
-        }
-        else if (Property->IsA<FIntProperty>())
-        {
-            int32 IntValue = static_cast<int32>(JsonValue->AsNumber());
-            FIntProperty* IntProperty = CastField<FIntProperty>(Property);
-            if (IntProperty)
-            {
-                IntProperty->SetPropertyValue_InContainer(ComponentTemplate, IntValue);
-            }
-        }
-        else if (Property->IsA<FFloatProperty>())
-        {
-            ((FFloatProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsNumber());
-        }
-        else if (Property->IsA<FStrProperty>())
-        {
-            ((FStrProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsString());
+            TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+            ResultObj->SetStringField(TEXT("component"), ComponentName);
+            ResultObj->SetStringField(TEXT("property"), PropertyName);
+            ResultObj->SetBoolField(TEXT("success"), true);
+            return ResultObj;
         }
         else
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Unsupported property type"));
+            return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
         }
-
-        // Mark the blueprint as modified
-        FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-
-        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-        ResultObj->SetStringField(TEXT("component"), ComponentName);
-        ResultObj->SetStringField(TEXT("property"), PropertyName);
-        return ResultObj;
     }
 
     return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'value' parameter"));
@@ -551,48 +526,23 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetBlueprintProperty(
     // Set the property value
     if (Params->HasField(TEXT("property_value")))
     {
-        FProperty* Property = DefaultObject->GetClass()->FindPropertyByName(*PropertyName);
-        if (!Property)
-        {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
-        }
-
-        // Set the property value based on its type
-        void* PropertyAddr = Property->ContainerPtrToValuePtr<void>(DefaultObject);
         TSharedPtr<FJsonValue> JsonValue = Params->Values.FindRef(TEXT("property_value"));
+        
+        FString ErrorMessage;
+        if (FUnrealMCPCommonUtils::SetObjectProperty(DefaultObject, PropertyName, JsonValue, ErrorMessage))
+        {
+            // Mark the blueprint as modified
+            FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
-        if (Property->IsA<FBoolProperty>())
-        {
-            ((FBoolProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsBool());
-        }
-        else if (Property->IsA<FIntProperty>())
-        {
-            int32 IntValue = static_cast<int32>(JsonValue->AsNumber());
-            FIntProperty* IntProperty = CastField<FIntProperty>(Property);
-            if (IntProperty)
-            {
-                IntProperty->SetPropertyValue_InContainer(DefaultObject, IntValue);
-            }
-        }
-        else if (Property->IsA<FFloatProperty>())
-        {
-            ((FFloatProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsNumber());
-        }
-        else if (Property->IsA<FStrProperty>())
-        {
-            ((FStrProperty*)Property)->SetPropertyValue(PropertyAddr, JsonValue->AsString());
+            TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+            ResultObj->SetStringField(TEXT("property"), PropertyName);
+            ResultObj->SetBoolField(TEXT("success"), true);
+            return ResultObj;
         }
         else
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Unsupported property type"));
+            return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
         }
-
-        // Mark the blueprint as modified
-        FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-
-        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-        ResultObj->SetStringField(TEXT("property"), PropertyName);
-        return ResultObj;
     }
 
     return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
@@ -694,76 +644,105 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetPawnProperties(con
         return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get default object"));
     }
 
+    // Track if any properties were set successfully
+    bool bAnyPropertiesSet = false;
+    TSharedPtr<FJsonObject> ResultsObj = MakeShared<FJsonObject>();
+    
     // Set auto possess player if specified
     if (Params->HasField(TEXT("auto_possess_player")))
     {
-        FString AutoPossessValue = Params->GetStringField(TEXT("auto_possess_player"));
-        FProperty* Property = DefaultObject->GetClass()->FindPropertyByName(TEXT("AutoPossessPlayer"));
+        TSharedPtr<FJsonValue> AutoPossessValue = Params->Values.FindRef(TEXT("auto_possess_player"));
         
-        if (!Property)
+        FString ErrorMessage;
+        if (FUnrealMCPCommonUtils::SetObjectProperty(DefaultObject, TEXT("AutoPossessPlayer"), AutoPossessValue, ErrorMessage))
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("AutoPossessPlayer property not found"));
+            bAnyPropertiesSet = true;
+            TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+            PropResultObj->SetBoolField(TEXT("success"), true);
+            ResultsObj->SetObjectField(TEXT("AutoPossessPlayer"), PropResultObj);
         }
-
-        // Get property value pointer
-        void* PropertyValuePtr = Property->ContainerPtrToValuePtr<void>(DefaultObject);
-
-        // Handle both FEnumProperty and TEnumAsByte cases
-        FEnumProperty* EnumProp = CastField<FEnumProperty>(Property);
-        FNumericProperty* NumProp = CastField<FNumericProperty>(Property);
-        UEnum* EnumDefinition = EnumProp ? EnumProp->GetEnum() : (NumProp && NumProp->IsEnum() ? NumProp->GetIntPropertyEnum() : nullptr);
-
-        if (!EnumDefinition)
+        else
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("AutoPossessPlayer is not a valid enum property"));
+            TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+            PropResultObj->SetBoolField(TEXT("success"), false);
+            PropResultObj->SetStringField(TEXT("error"), ErrorMessage);
+            ResultsObj->SetObjectField(TEXT("AutoPossessPlayer"), PropResultObj);
         }
-
-        // Log available enum values for debugging
-        UE_LOG(LogTemp, Display, TEXT("Setting AutoPossessPlayer with value '%s'. Available options:"), *AutoPossessValue);
-        for (int32 i = 0; i < EnumDefinition->NumEnums(); i++)
+    }
+    
+    // Set controller rotation properties
+    const TCHAR* RotationProps[] = {
+        TEXT("bUseControllerRotationYaw"),
+        TEXT("bUseControllerRotationPitch"),
+        TEXT("bUseControllerRotationRoll")
+    };
+    
+    const TCHAR* ParamNames[] = {
+        TEXT("use_controller_rotation_yaw"),
+        TEXT("use_controller_rotation_pitch"),
+        TEXT("use_controller_rotation_roll")
+    };
+    
+    for (int32 i = 0; i < 3; i++)
+    {
+        if (Params->HasField(ParamNames[i]))
         {
-            UE_LOG(LogTemp, Display, TEXT("  - %s (value: %d)"), *EnumDefinition->GetNameStringByIndex(i), EnumDefinition->GetValueByIndex(i));
+            TSharedPtr<FJsonValue> Value = Params->Values.FindRef(ParamNames[i]);
+            
+            FString ErrorMessage;
+            if (FUnrealMCPCommonUtils::SetObjectProperty(DefaultObject, RotationProps[i], Value, ErrorMessage))
+            {
+                bAnyPropertiesSet = true;
+                TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+                PropResultObj->SetBoolField(TEXT("success"), true);
+                ResultsObj->SetObjectField(RotationProps[i], PropResultObj);
+            }
+            else
+            {
+                TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+                PropResultObj->SetBoolField(TEXT("success"), false);
+                PropResultObj->SetStringField(TEXT("error"), ErrorMessage);
+                ResultsObj->SetObjectField(RotationProps[i], PropResultObj);
+            }
         }
-
-        // Extract the short enum name if we have a qualified name (EAutoReceiveInput::Player0)
-        FString EnumValueName = AutoPossessValue;
-        if (AutoPossessValue.Contains(TEXT("::")))
+    }
+    
+    // Set can be damaged property
+    if (Params->HasField(TEXT("can_be_damaged")))
+    {
+        TSharedPtr<FJsonValue> Value = Params->Values.FindRef(TEXT("can_be_damaged"));
+        
+        FString ErrorMessage;
+        if (FUnrealMCPCommonUtils::SetObjectProperty(DefaultObject, TEXT("bCanBeDamaged"), Value, ErrorMessage))
         {
-            AutoPossessValue.Split(TEXT("::"), nullptr, &EnumValueName);
-            UE_LOG(LogTemp, Display, TEXT("Using short enum name: %s from full name: %s"), *EnumValueName, *AutoPossessValue);
+            bAnyPropertiesSet = true;
+            TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+            PropResultObj->SetBoolField(TEXT("success"), true);
+            ResultsObj->SetObjectField(TEXT("bCanBeDamaged"), PropResultObj);
         }
-
-        // Find the enum value using the name
-        int64 EnumValue = EnumDefinition->GetValueByNameString(EnumValueName);
-
-        // If not found, try with the full name as a fallback
-        if (EnumValue == INDEX_NONE)
+        else
         {
-            EnumValue = EnumDefinition->GetValueByNameString(AutoPossessValue);
-            UE_LOG(LogTemp, Display, TEXT("Short name not found, trying with full value: %s, result: %lld"), *AutoPossessValue, EnumValue);
+            TSharedPtr<FJsonObject> PropResultObj = MakeShared<FJsonObject>();
+            PropResultObj->SetBoolField(TEXT("success"), false);
+            PropResultObj->SetStringField(TEXT("error"), ErrorMessage);
+            ResultsObj->SetObjectField(TEXT("bCanBeDamaged"), PropResultObj);
         }
-
-        if (EnumValue == INDEX_NONE)
-        {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Could not find enum value for '%s'"), *AutoPossessValue));
-        }
-
-        // Get the underlying numeric property and set the value
-        FNumericProperty* UnderlyingNumericProp = EnumProp ? EnumProp->GetUnderlyingProperty() : NumProp;
-        if (!UnderlyingNumericProp)
-        {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get underlying numeric property"));
-        }
-
-        UnderlyingNumericProp->SetIntPropertyValue(PropertyValuePtr, EnumValue);
-        UE_LOG(LogTemp, Display, TEXT("Successfully set AutoPossessPlayer to '%s' (value: %lld)"), *AutoPossessValue, EnumValue);
     }
 
-    // Mark the blueprint as modified
-    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+    // Mark the blueprint as modified if any properties were set
+    if (bAnyPropertiesSet)
+    {
+        FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+    }
+    else if (ResultsObj->Values.Num() == 0)
+    {
+        // No properties were specified
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("No properties specified to set"));
+    }
 
-    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-    ResultObj->SetStringField(TEXT("blueprint"), BlueprintName);
-    ResultObj->SetBoolField(TEXT("success"), true);
-    return ResultObj;
+    TSharedPtr<FJsonObject> ResponseObj = MakeShared<FJsonObject>();
+    ResponseObj->SetStringField(TEXT("blueprint"), BlueprintName);
+    ResponseObj->SetBoolField(TEXT("success"), bAnyPropertiesSet);
+    ResponseObj->SetObjectField(TEXT("results"), ResultsObj);
+    return ResponseObj;
 } 

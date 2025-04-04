@@ -170,9 +170,9 @@ def register_editor_tools(mcp: FastMCP):
     def set_actor_transform(
         ctx: Context,
         name: str,
-        location: List[float] | None = None,
-        rotation: List[float] | None = None,
-        scale: List[float] | None = None
+        location: List[float]  = None,
+        rotation: List[float]  = None,
+        scale: List[float] = None
     ) -> Dict[str, Any]:
         """Set the transform of an actor."""
         from unreal_mcp_server import get_unreal_connection
@@ -217,6 +217,50 @@ def register_editor_tools(mcp: FastMCP):
         except Exception as e:
             logger.error(f"Error getting properties: {e}")
             return {}
+
+    @mcp.tool()
+    def set_actor_property(
+        ctx: Context,
+        name: str,
+        property_name: str,
+        property_value,
+    ) -> Dict[str, Any]:
+        """
+        Set a property on an actor.
+        
+        Args:
+            name: Name of the actor
+            property_name: Name of the property to set
+            property_value: Value to set the property to
+            
+        Returns:
+            Dict containing response from Unreal with operation status
+        """
+        from unreal_mcp_server import get_unreal_connection
+        
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+                
+            response = unreal.send_command("set_actor_property", {
+                "name": name,
+                "property_name": property_name,
+                "property_value": property_value
+            })
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Set actor property response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error setting actor property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
 
     @mcp.tool()
     def focus_viewport(

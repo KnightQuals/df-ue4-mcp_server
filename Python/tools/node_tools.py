@@ -234,7 +234,7 @@ def register_blueprint_node_tools(mcp: FastMCP):
         blueprint_name: str,
         variable_name: str,
         variable_type: str,
-        default_value: Any = None,
+        default_value = None,
         is_exposed: bool = False
     ) -> Dict[str, Any]:
         """

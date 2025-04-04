@@ -171,7 +171,7 @@ def register_blueprint_tools(mcp: FastMCP):
         blueprint_name: str,
         component_name: str,
         property_name: str,
-        property_value: Any
+        property_value,
     ) -> Dict[str, Any]:
         """Set a property on a component in a Blueprint."""
         from unreal_mcp_server import get_unreal_connection

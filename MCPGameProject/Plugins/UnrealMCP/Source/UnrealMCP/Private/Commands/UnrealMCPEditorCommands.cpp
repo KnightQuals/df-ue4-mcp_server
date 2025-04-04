@@ -56,6 +56,10 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     {
         return HandleGetActorProperties(Params);
     }
+    else if (CommandType == TEXT("set_actor_property"))
+    {
+        return HandleSetActorProperty(Params);
+    }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
     {
@@ -327,6 +331,69 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorProperties(const
 
     // Always return detailed properties for this command
     return FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true);
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get actor name
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+    }
+
+    // Find the actor
+    AActor* TargetActor = nullptr;
+    TArray<AActor*> AllActors;
+    UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
+    
+    for (AActor* Actor : AllActors)
+    {
+        if (Actor && Actor->GetName() == ActorName)
+        {
+            TargetActor = Actor;
+            break;
+        }
+    }
+
+    if (!TargetActor)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    }
+
+    // Get property name
+    FString PropertyName;
+    if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
+    }
+
+    // Get property value
+    if (!Params->HasField(TEXT("property_value")))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
+    }
+    
+    TSharedPtr<FJsonValue> PropertyValue = Params->Values.FindRef(TEXT("property_value"));
+    
+    // Set the property using our utility function
+    FString ErrorMessage;
+    if (FUnrealMCPCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage))
+    {
+        // Property set successfully
+        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+        ResultObj->SetStringField(TEXT("actor"), ActorName);
+        ResultObj->SetStringField(TEXT("property"), PropertyName);
+        ResultObj->SetBoolField(TEXT("success"), true);
+        
+        // Also include the full actor details
+        ResultObj->SetObjectField(TEXT("actor_details"), FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true));
+        return ResultObj;
+    }
+    else
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
+    }
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
