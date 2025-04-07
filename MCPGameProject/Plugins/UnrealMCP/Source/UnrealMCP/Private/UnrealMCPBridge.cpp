@@ -231,6 +231,7 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("delete_actor") || 
                      CommandType == TEXT("set_actor_transform") ||
                      CommandType == TEXT("get_actor_properties") ||
+                     CommandType == TEXT("set_actor_property") ||
                      CommandType == TEXT("spawn_blueprint_actor") ||
                      CommandType == TEXT("focus_viewport") || 
                      CommandType == TEXT("take_screenshot"))
@@ -270,6 +271,9 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
             // UMG Commands
             else if (CommandType == TEXT("create_umg_widget_blueprint") ||
                      CommandType == TEXT("add_text_block_to_widget") ||
+                     CommandType == TEXT("add_button_to_widget") ||
+                     CommandType == TEXT("bind_widget_event") ||
+                     CommandType == TEXT("set_text_block_binding") ||
                      CommandType == TEXT("add_widget_to_viewport"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
