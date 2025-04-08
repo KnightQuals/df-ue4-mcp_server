@@ -76,6 +76,14 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleCreateBlueprint(const
         return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
+    // Check if blueprint already exists
+    FString PackagePath = TEXT("/Game/Blueprints/");
+    FString AssetName = BlueprintName;
+    if (UEditorAssetLibrary::DoesAssetExist(PackagePath + AssetName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint already exists: %s"), *BlueprintName));
+    }
+
     // Create the blueprint factory
     UBlueprintFactory* Factory = NewObject<UBlueprintFactory>();
     
@@ -134,9 +142,6 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleCreateBlueprint(const
     Factory->ParentClass = SelectedParentClass;
 
     // Create the blueprint
-    FString PackagePath = TEXT("/Game/Blueprints/");
-    FString AssetName = BlueprintName;
-    
     UPackage* Package = CreatePackage(*(PackagePath + AssetName));
     UBlueprint* NewBlueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(UBlueprint::StaticClass(), Package, *AssetName, RF_Standalone | RF_Public, nullptr, GWarn));
 
@@ -299,20 +304,141 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetComponentProperty(
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component not found: %s"), *ComponentName));
     }
 
-    // Set the property value
+    // Get the component template
     UObject* ComponentTemplate = ComponentNode->ComponentTemplate;
     if (!ComponentTemplate)
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Invalid component template"));
     }
 
-    // Handle different property types
-    if (Params->HasField(TEXT("value")))
+    // Set the property value
+    if (Params->HasField(TEXT("property_value")))
     {
-        TSharedPtr<FJsonValue> JsonValue = Params->Values.FindRef(TEXT("value"));
+        TSharedPtr<FJsonValue> JsonValue = Params->Values.FindRef(TEXT("property_value"));
         
+        // Get the property
+        FProperty* Property = FindFProperty<FProperty>(ComponentTemplate->GetClass(), *PropertyName);
+        if (!Property)
+        {
+            return FUnrealMCPCommonUtils::CreateErrorResponse(
+                FString::Printf(TEXT("Property %s not found on component %s"), *PropertyName, *ComponentName));
+        }
+
+        bool bSuccess = false;
         FString ErrorMessage;
-        if (FUnrealMCPCommonUtils::SetObjectProperty(ComponentTemplate, PropertyName, JsonValue, ErrorMessage))
+
+        // Handle different property types
+        if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
+        {
+            // Handle vector properties
+            if (StructProp->Struct == TBaseStructure<FVector>::Get())
+            {
+                if (JsonValue->Type == EJson::Array)
+                {
+                    // Handle array input [x, y, z]
+                    const TArray<TSharedPtr<FJsonValue>>& Arr = JsonValue->AsArray();
+                    if (Arr.Num() == 3)
+                    {
+                        FVector Vec(
+                            Arr[0]->AsNumber(),
+                            Arr[1]->AsNumber(),
+                            Arr[2]->AsNumber()
+                        );
+                        void* PropertyAddr = StructProp->ContainerPtrToValuePtr<void>(ComponentTemplate);
+                        StructProp->CopySingleValue(PropertyAddr, &Vec);
+                        bSuccess = true;
+                    }
+                    else
+                    {
+                        ErrorMessage = FString::Printf(TEXT("Vector property requires 3 values, got %d"), Arr.Num());
+                    }
+                }
+                else if (JsonValue->Type == EJson::Number)
+                {
+                    // Handle scalar input (sets all components to same value)
+                    float Value = JsonValue->AsNumber();
+                    FVector Vec(Value, Value, Value);
+                    void* PropertyAddr = StructProp->ContainerPtrToValuePtr<void>(ComponentTemplate);
+                    StructProp->CopySingleValue(PropertyAddr, &Vec);
+                    bSuccess = true;
+                }
+                else
+                {
+                    ErrorMessage = TEXT("Vector property requires either a single number or array of 3 numbers");
+                }
+            }
+            else
+            {
+                // Handle other struct properties using default handler
+                bSuccess = FUnrealMCPCommonUtils::SetObjectProperty(ComponentTemplate, PropertyName, JsonValue, ErrorMessage);
+            }
+        }
+        else if (FEnumProperty* EnumProp = CastField<FEnumProperty>(Property))
+        {
+            // Handle enum properties
+            if (JsonValue->Type == EJson::String)
+            {
+                FString EnumValueName = JsonValue->AsString();
+                UEnum* Enum = EnumProp->GetEnum();
+                int64 EnumValue = Enum->GetValueByNameString(EnumValueName);
+                
+                if (EnumValue != INDEX_NONE)
+                {
+                    EnumProp->GetUnderlyingProperty()->SetIntPropertyValue(
+                        ComponentTemplate, 
+                        EnumValue
+                    );
+                    bSuccess = true;
+                }
+                else
+                {
+                    ErrorMessage = FString::Printf(TEXT("Invalid enum value '%s' for property %s"), 
+                        *EnumValueName, *PropertyName);
+                }
+            }
+            else if (JsonValue->Type == EJson::Number)
+            {
+                // Allow setting enum by integer value
+                int64 EnumValue = JsonValue->AsNumber();
+                EnumProp->GetUnderlyingProperty()->SetIntPropertyValue(
+                    ComponentTemplate, 
+                    EnumValue
+                );
+                bSuccess = true;
+            }
+            else
+            {
+                ErrorMessage = TEXT("Enum property requires either a string name or integer value");
+            }
+        }
+        else if (FNumericProperty* NumericProp = CastField<FNumericProperty>(Property))
+        {
+            // Handle numeric properties
+            if (JsonValue->Type == EJson::Number)
+            {
+                if (NumericProp->IsInteger())
+                {
+                    NumericProp->SetIntPropertyValue(ComponentTemplate, (int64)JsonValue->AsNumber());
+                    bSuccess = true;
+                }
+                else if (NumericProp->IsFloatingPoint())
+                {
+                    NumericProp->SetFloatingPointPropertyValue(ComponentTemplate, JsonValue->AsNumber());
+                    bSuccess = true;
+                }
+            }
+            else
+            {
+                ErrorMessage = TEXT("Numeric property requires a number value");
+            }
+        }
+        else
+        {
+            // Handle all other property types using default handler
+            bSuccess = FUnrealMCPCommonUtils::SetObjectProperty(ComponentTemplate, PropertyName, JsonValue, ErrorMessage);
+        }
+
+        if (bSuccess)
         {
             // Mark the blueprint as modified
             FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
@@ -329,7 +455,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetComponentProperty(
         }
     }
 
-    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'value' parameter"));
+    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSetPhysicsProperties(const TSharedPtr<FJsonObject>& Params)
@@ -458,7 +584,6 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSpawnBlueprintActor(c
     // Get transform parameters
     FVector Location(0.0f, 0.0f, 0.0f);
     FRotator Rotation(0.0f, 0.0f, 0.0f);
-    FVector Scale(1.0f, 1.0f, 1.0f);
 
     if (Params->HasField(TEXT("location")))
     {
@@ -467,10 +592,6 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSpawnBlueprintActor(c
     if (Params->HasField(TEXT("rotation")))
     {
         Rotation = FUnrealMCPCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
-    }
-    if (Params->HasField(TEXT("scale")))
-    {
-        Scale = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("scale"));
     }
 
     // Spawn the actor
@@ -483,11 +604,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleSpawnBlueprintActor(c
     FTransform SpawnTransform;
     SpawnTransform.SetLocation(Location);
     SpawnTransform.SetRotation(FQuat(Rotation));
-    SpawnTransform.SetScale3D(Scale);
 
     AActor* NewActor = World->SpawnActor<AActor>(Blueprint->GeneratedClass, SpawnTransform);
     if (NewActor)
     {
+        NewActor->SetActorLabel(*ActorName);
         return FUnrealMCPCommonUtils::ActorToJsonObject(NewActor, true);
     }
 

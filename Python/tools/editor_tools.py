@@ -81,8 +81,7 @@ def register_editor_tools(mcp: FastMCP):
         name: str,
         type: str,
         location: List[float] = [0.0, 0.0, 0.0],
-        rotation: List[float] = [0.0, 0.0, 0.0],
-        scale: List[float] = [1.0, 1.0, 1.0]
+        rotation: List[float] = [0.0, 0.0, 0.0]
     ) -> Dict[str, Any]:
         """Create a new actor in the current level.
         
@@ -92,7 +91,6 @@ def register_editor_tools(mcp: FastMCP):
             type: The type of actor to create (e.g. StaticMeshActor, PointLight)
             location: The [x, y, z] world location to spawn at
             rotation: The [pitch, yaw, roll] rotation in degrees
-            scale: The [x, y, z] scale to apply
             
         Returns:
             Dict containing the created actor's properties
@@ -110,12 +108,11 @@ def register_editor_tools(mcp: FastMCP):
                 "name": name,
                 "type": type.upper(),  # Make sure type is uppercase
                 "location": location,
-                "rotation": rotation,
-                "scale": scale
+                "rotation": rotation
             }
             
-            # Validate location, rotation, and scale formats
-            for param_name in ["location", "rotation", "scale"]:
+            # Validate location and rotation formats
+            for param_name in ["location", "rotation"]:
                 param_value = params[param_name]
                 if not isinstance(param_value, list) or len(param_value) != 3:
                     logger.error(f"Invalid {param_name} format: {param_value}. Must be a list of 3 float values.")
@@ -262,7 +259,7 @@ def register_editor_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
-    @mcp.tool()
+    # @mcp.tool() commented out because it's buggy
     def focus_viewport(
         ctx: Context,
         target: str = None,
@@ -315,10 +312,20 @@ def register_editor_tools(mcp: FastMCP):
         blueprint_name: str,
         actor_name: str,
         location: List[float] = [0.0, 0.0, 0.0],
-        rotation: List[float] = [0.0, 0.0, 0.0],
-        scale: List[float] = [1.0, 1.0, 1.0]
+        rotation: List[float] = [0.0, 0.0, 0.0]
     ) -> Dict[str, Any]:
-        """Spawn an actor from a Blueprint."""
+        """Spawn an actor from a Blueprint.
+        
+        Args:
+            ctx: The MCP context
+            blueprint_name: Name of the Blueprint to spawn from
+            actor_name: Name to give the spawned actor
+            location: The [x, y, z] world location to spawn at
+            rotation: The [pitch, yaw, roll] rotation in degrees
+            
+        Returns:
+            Dict containing the spawned actor's properties
+        """
         from unreal_mcp_server import get_unreal_connection
         
         try:
@@ -332,12 +339,11 @@ def register_editor_tools(mcp: FastMCP):
                 "blueprint_name": blueprint_name,
                 "actor_name": actor_name,
                 "location": location or [0.0, 0.0, 0.0],
-                "rotation": rotation or [0.0, 0.0, 0.0],
-                "scale": scale or [1.0, 1.0, 1.0]
+                "rotation": rotation or [0.0, 0.0, 0.0]
             }
             
-            # Validate location, rotation, and scale formats
-            for param_name in ["location", "rotation", "scale"]:
+            # Validate location and rotation formats
+            for param_name in ["location", "rotation"]:
                 param_value = params[param_name]
                 if not isinstance(param_value, list) or len(param_value) != 3:
                     logger.error(f"Invalid {param_name} format: {param_value}. Must be a list of 3 float values.")

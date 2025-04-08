@@ -166,6 +166,7 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
     
+    @mcp.tool()
     def set_component_property(
         ctx: Context,
         blueprint_name: str,
