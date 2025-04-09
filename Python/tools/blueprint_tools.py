@@ -330,7 +330,7 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
-    @mcp.tool()
+    # @mcp.tool() commented out, just use set_component_property instead
     def set_pawn_properties(
         ctx: Context,
         blueprint_name: str,

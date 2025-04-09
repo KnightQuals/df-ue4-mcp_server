@@ -26,7 +26,10 @@ def register_blueprint_node_tools(mcp: FastMCP):
         
         Args:
             blueprint_name: Name of the target Blueprint
-            event_name: Name of the event (BeginPlay, Tick, etc.)
+            event_name: Name of the event. Use 'Receive' prefix for standard events:
+                       - 'ReceiveBeginPlay' for Begin Play
+                       - 'ReceiveTick' for Tick
+                       - etc.
             node_position: Optional [X, Y] position in the graph
             
         Returns:
@@ -234,7 +237,6 @@ def register_blueprint_node_tools(mcp: FastMCP):
         blueprint_name: str,
         variable_name: str,
         variable_type: str,
-        default_value = None,
         is_exposed: bool = False
     ) -> Dict[str, Any]:
         """
@@ -244,7 +246,6 @@ def register_blueprint_node_tools(mcp: FastMCP):
             blueprint_name: Name of the target Blueprint
             variable_name: Name of the variable
             variable_type: Type of the variable (Boolean, Integer, Float, Vector, etc.)
-            default_value: Optional default value for the variable
             is_exposed: Whether to expose the variable to the editor
             
         Returns:
@@ -257,7 +258,6 @@ def register_blueprint_node_tools(mcp: FastMCP):
                 "blueprint_name": blueprint_name,
                 "variable_name": variable_name,
                 "variable_type": variable_type,
-                "default_value": default_value,
                 "is_exposed": is_exposed
             }
             
