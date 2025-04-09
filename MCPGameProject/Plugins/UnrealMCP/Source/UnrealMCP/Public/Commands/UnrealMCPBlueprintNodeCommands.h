@@ -4,7 +4,7 @@
 #include "Json.h"
 
 /**
- * Handler class for Blueprint node-related MCP commands
+ * Handler class for Blueprint Node-related MCP commands
  */
 class UNREALMCP_API FUnrealMCPBlueprintNodeCommands
 {
@@ -17,7 +17,6 @@ public:
 private:
     // Specific blueprint node command handlers
     TSharedPtr<FJsonObject> HandleConnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params);
-    TSharedPtr<FJsonObject> HandleCreateInputMapping(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintGetSelfComponentReference(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintEvent(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintFunctionCall(const TSharedPtr<FJsonObject>& Params);

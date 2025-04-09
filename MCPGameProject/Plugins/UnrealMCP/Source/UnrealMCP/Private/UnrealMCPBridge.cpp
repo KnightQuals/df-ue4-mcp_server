@@ -51,15 +51,34 @@
 #include "EditorSubsystem.h"
 #include "Subsystems/EditorActorSubsystem.h"
 // Include our new command handler classes
-#include "Commands/UnrealMCPActorCommands.h"
 #include "Commands/UnrealMCPEditorCommands.h"
 #include "Commands/UnrealMCPBlueprintCommands.h"
 #include "Commands/UnrealMCPBlueprintNodeCommands.h"
+#include "Commands/UnrealMCPProjectCommands.h"
 #include "Commands/UnrealMCPCommonUtils.h"
+#include "Commands/UnrealMCPUMGCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
 #define MCP_SERVER_PORT 55557
+
+UUnrealMCPBridge::UUnrealMCPBridge()
+{
+    EditorCommands = MakeShared<FUnrealMCPEditorCommands>();
+    BlueprintCommands = MakeShared<FUnrealMCPBlueprintCommands>();
+    BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
+    ProjectCommands = MakeShared<FUnrealMCPProjectCommands>();
+    UMGCommands = MakeShared<FUnrealMCPUMGCommands>();
+}
+
+UUnrealMCPBridge::~UUnrealMCPBridge()
+{
+    EditorCommands.Reset();
+    BlueprintCommands.Reset();
+    BlueprintNodeCommands.Reset();
+    ProjectCommands.Reset();
+    UMGCommands.Reset();
+}
 
 // Initialize subsystem
 void UUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
@@ -72,12 +91,6 @@ void UUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
     ServerThread = nullptr;
     Port = MCP_SERVER_PORT;
     FIPv4Address::Parse(MCP_SERVER_HOST, ServerAddress);
-
-    // Create command handlers
-    ActorCommands = MakeShared<FUnrealMCPActorCommands>();
-    EditorCommands = MakeShared<FUnrealMCPEditorCommands>();
-    BlueprintCommands = MakeShared<FUnrealMCPBlueprintCommands>();
-    BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
 
     // Start the server automatically
     StartServer();
@@ -210,18 +223,17 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                 ResultJson = MakeShareable(new FJsonObject);
                 ResultJson->SetStringField(TEXT("message"), TEXT("pong"));
             }
-            // Actor Commands
+            // Editor Commands (including actor manipulation)
             else if (CommandType == TEXT("get_actors_in_level") || 
                      CommandType == TEXT("find_actors_by_name") ||
-                     CommandType == TEXT("create_actor") || 
+                     CommandType == TEXT("spawn_actor") ||
+                     CommandType == TEXT("create_actor") ||
                      CommandType == TEXT("delete_actor") || 
                      CommandType == TEXT("set_actor_transform") ||
-                     CommandType == TEXT("get_actor_properties"))
-            {
-                ResultJson = ActorCommands->HandleCommand(CommandType, Params);
-            }
-            // Editor Commands
-            else if (CommandType == TEXT("focus_viewport") || 
+                     CommandType == TEXT("get_actor_properties") ||
+                     CommandType == TEXT("set_actor_property") ||
+                     CommandType == TEXT("spawn_blueprint_actor") ||
+                     CommandType == TEXT("focus_viewport") || 
                      CommandType == TEXT("take_screenshot"))
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
@@ -232,7 +244,6 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("set_component_property") || 
                      CommandType == TEXT("set_physics_properties") || 
                      CommandType == TEXT("compile_blueprint") || 
-                     CommandType == TEXT("spawn_blueprint_actor") || 
                      CommandType == TEXT("set_blueprint_property") || 
                      CommandType == TEXT("set_static_mesh_properties") ||
                      CommandType == TEXT("set_pawn_properties"))
@@ -241,7 +252,6 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
             }
             // Blueprint Node Commands
             else if (CommandType == TEXT("connect_blueprint_nodes") || 
-                     CommandType == TEXT("create_input_mapping") || 
                      CommandType == TEXT("add_blueprint_get_self_component_reference") ||
                      CommandType == TEXT("add_blueprint_self_reference") ||
                      CommandType == TEXT("find_blueprint_nodes") ||
@@ -252,6 +262,21 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("add_blueprint_variable"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
+            }
+            // Project Commands
+            else if (CommandType == TEXT("create_input_mapping"))
+            {
+                ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
+            }
+            // UMG Commands
+            else if (CommandType == TEXT("create_umg_widget_blueprint") ||
+                     CommandType == TEXT("add_text_block_to_widget") ||
+                     CommandType == TEXT("add_button_to_widget") ||
+                     CommandType == TEXT("bind_widget_event") ||
+                     CommandType == TEXT("set_text_block_binding") ||
+                     CommandType == TEXT("add_widget_to_viewport"))
+            {
+                ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }
             else
             {
@@ -304,32 +329,4 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
     });
     
     return Future.Get();
-}
-
-// For now, we'll keep the original command handler methods in place
-// They'll be eventually removed once we've fully migrated all functionality to the handlers
-
-// The original handler methods will be kept for the initial build test
-TSharedPtr<FJsonObject> UUnrealMCPBridge::HandleActorCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
-{
-    // This is a temporary pass-through to the new ActorCommands handler
-    return ActorCommands->HandleCommand(CommandType, Params);
-}
-
-TSharedPtr<FJsonObject> UUnrealMCPBridge::HandleEditorCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
-{
-    // This is a temporary pass-through to the new EditorCommands handler
-    return EditorCommands->HandleCommand(CommandType, Params);
-}
-
-TSharedPtr<FJsonObject> UUnrealMCPBridge::HandleBlueprintCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
-{
-    // This is a temporary pass-through to the new BlueprintCommands handler
-    return BlueprintCommands->HandleCommand(CommandType, Params);
-}
-
-TSharedPtr<FJsonObject> UUnrealMCPBridge::HandleBlueprintNodeCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
-{
-    // This is a temporary pass-through to the new BlueprintNodeCommands handler
-    return BlueprintNodeCommands->HandleCommand(CommandType, Params);
 }
