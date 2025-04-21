@@ -15,9 +15,8 @@ dependencies = [
 unreal_mcp_server = "unreal_mcp.server:mcp.run"
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-where = ["."] # Explicitly look for packages in the current directory
-include = ["unreal_mcp*"]
+[tool.hatch.build.targets.wheel]
+packages = ["unreal_mcp"]
