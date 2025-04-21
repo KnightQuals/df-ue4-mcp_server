@@ -106,46 +106,42 @@ Otherwise, if you want to use the plugin in your existing project:
 
 ### Python Server Setup
 
-See [Python/README.md](Python/README.md) for detailed Python setup instructions, including:
-- Setting up your Python environment
-- Running the MCP server
-- Using direct or server-based connections
-
-### Configuring your MCP Client
-
-Use the following JSON for your mcp configuration based on your MCP client.
+Use `uvx` to run directly from the repository without cloning:
 
 ```json
 {
   "mcpServers": {
     "unrealMCP": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "<path/to/the/folder/PYTHON>",
-        "run",
-        "unreal_mcp_server.py"
-      ]
+        "--from", 
+        "git+https://github.com/chongdashu/unreal-mcp#subdirectory=Python", 
+        "unreal_mcp_server"]
     }
   }
 }
 ```
 
-An example is found in `mcp.json`
+See [mcp.json](mcp.json) for an example configuration that you can use.
+
+You will need to have `uv` installed.
+
+```bash
+  # On Unix/macOS:
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+
+  # On Windows (PowerShell):
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
+
+For more instructions, including how to run the server manually from source, see [Python/README.md](Python/README.md).
 
 ### MCP Configuration Locations
 
-Depending on which MCP client you're using, the configuration file location will differ:
+The location of your MCP configuration file depends on your client:
 
-| MCP Client | Configuration File Location | Notes |
-|------------|------------------------------|-------|
-| Claude Desktop | `~/.config/claude-desktop/mcp.json` | On Windows: `%USERPROFILE%\.config\claude-desktop\mcp.json` |
-| Cursor | `.cursor/mcp.json` | Located in your project root directory |
-| Windsurf | `~/.config/windsurf/mcp.json` | On Windows: `%USERPROFILE%\.config\windsurf\mcp.json` |
-
-Each client uses the same JSON format as shown in the example above. 
-Simply place the configuration in the appropriate location for your MCP client.
-
+- Codeium: `~/.codeium/windsurf/mcp_config.json`
+- Other clients: Refer to your client's documentation
 
 ## License
 MIT
