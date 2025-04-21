@@ -112,11 +112,13 @@ Use `uvx` to run directly from the repository without cloning:
 {
   "mcpServers": {
     "unrealMCP": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
-        "--from", 
-        "git+https://github.com/chongdashu/unreal-mcp#subdirectory=Python", 
-        "unreal_mcp_server"]
+        "--directory", 
+        "<path/to/your/repo/Python>", 
+        "run", 
+        "unreal_mcp_server"
+      ]
     }
   }
 }

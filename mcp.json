@@ -1,10 +1,11 @@
 {
   "mcpServers": {
     "unrealMCP": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
-        "--from",
-        "git+https://github.com/chongdashu/unreal-mcp#subdirectory=Python",
+        "--directory", 
+        "<path/to/your/repo/Python>", 
+        "run", 
         "unreal_mcp_server"
       ]
     }

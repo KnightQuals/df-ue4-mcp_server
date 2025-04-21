@@ -15,25 +15,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ### 2. Configuring your MCP Client
 
-Use one of the following configurations in your MCP client's config file:
-
-### Option 1: Direct from Repository
-
-```json
-{
-  "mcpServers": {
-    "unrealMCP": {
-      "command": "uvx",
-      "args": [
-          "--from", 
-          "git+https://github.com/chongdashu/unreal-mcp#subdirectory=Python", 
-          "unreal_mcp_server"]
-    }
-  }
-}
-```
-
-#### Option 2: Local Installation
+Use the following configuration in your MCP client's config file:
 
 ```json
 {
