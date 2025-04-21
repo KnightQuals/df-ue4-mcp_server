@@ -295,7 +295,3 @@ def info():
     - Clean up resources on errors
     """
 
-# Run the server
-if __name__ == "__main__":
-    logger.info("Starting MCP server with stdio transport")
-    mcp.run(transport='stdio')
