@@ -208,8 +208,92 @@ def info():
     """Information about available Unreal MCP tools and best practices."""
     return """
     # Unreal MCP Server Tools and Best Practices
-    ...
-"""
+    
+    ## UMG (Widget Blueprint) Tools
+    - `create_umg_widget_blueprint(widget_name, parent_class="UserWidget", path="/Game/UI")` 
+      Create a new UMG Widget Blueprint
+    - `add_text_block_to_widget(widget_name, text_block_name, text="", position=[0,0], size=[200,50], font_size=12, color=[1,1,1,1])`
+      Add a Text Block widget with customizable properties
+    - `add_button_to_widget(widget_name, button_name, text="", position=[0,0], size=[200,50], font_size=12, color=[1,1,1,1], background_color=[0.1,0.1,0.1,1])`
+      Add a Button widget with text and styling
+    - `bind_widget_event(widget_name, widget_component_name, event_name, function_name="")`
+      Bind events like OnClicked to functions
+    - `add_widget_to_viewport(widget_name, z_order=0)`
+      Add widget instance to game viewport
+    - `set_text_block_binding(widget_name, text_block_name, binding_property, binding_type="Text")`
+      Set up dynamic property binding for text blocks
+
+    ## Editor Tools
+    ### Viewport and Screenshots
+    - `focus_viewport(target, location, distance, orientation)` - Focus viewport
+    - `take_screenshot(filename, show_ui, resolution)` - Capture screenshots
+
+    ### Actor Management
+    - `get_actors_in_level()` - List all actors in current level
+    - `find_actors_by_name(pattern)` - Find actors by name pattern
+    - `spawn_actor(name, type, location=[0,0,0], rotation=[0,0,0], scale=[1,1,1])` - Create actors
+    - `delete_actor(name)` - Remove actors
+    - `set_actor_transform(name, location, rotation, scale)` - Modify actor transform
+    - `get_actor_properties(name)` - Get actor properties
+    
+    ## Blueprint Management
+    - `create_blueprint(name, parent_class)` - Create new Blueprint classes
+    - `add_component_to_blueprint(blueprint_name, component_type, component_name)` - Add components
+    - `set_static_mesh_properties(blueprint_name, component_name, static_mesh)` - Configure meshes
+    - `set_physics_properties(blueprint_name, component_name)` - Configure physics
+    - `compile_blueprint(blueprint_name)` - Compile Blueprint changes
+    - `set_blueprint_property(blueprint_name, property_name, property_value)` - Set properties
+    - `set_pawn_properties(blueprint_name)` - Configure Pawn settings
+    - `spawn_blueprint_actor(blueprint_name, actor_name)` - Spawn Blueprint actors
+    
+    ## Blueprint Node Management
+    - `add_blueprint_event_node(blueprint_name, event_type)` - Add event nodes
+    - `add_blueprint_input_action_node(blueprint_name, action_name)` - Add input nodes
+    - `add_blueprint_function_node(blueprint_name, target, function_name)` - Add function nodes
+    - `connect_blueprint_nodes(blueprint_name, source_node_id, source_pin, target_node_id, target_pin)` - Connect nodes
+    - `add_blueprint_variable(blueprint_name, variable_name, variable_type)` - Add variables
+    - `add_blueprint_get_self_component_reference(blueprint_name, component_name)` - Add component refs
+    - `add_blueprint_self_reference(blueprint_name)` - Add self references
+    - `find_blueprint_nodes(blueprint_name, node_type, event_type)` - Find nodes
+    
+    ## Project Tools
+    - `create_input_mapping(action_name, key, input_type)` - Create input mappings
+    
+    ## Best Practices
+    
+    ### UMG Widget Development
+    - Create widgets with descriptive names that reflect their purpose
+    - Use consistent naming conventions for widget components
+    - Organize widget hierarchy logically
+    - Set appropriate anchors and alignment for responsive layouts
+    - Use property bindings for dynamic updates instead of direct setting
+    - Handle widget events appropriately with meaningful function names
+    - Clean up widgets when no longer needed
+    - Test widget layouts at different resolutions
+    
+    ### Editor and Actor Management
+    - Use unique names for actors to avoid conflicts
+    - Clean up temporary actors
+    - Validate transforms before applying
+    - Check actor existence before modifications
+    - Take regular viewport screenshots during development
+    - Keep the viewport focused on relevant actors during operations
+    
+    ### Blueprint Development
+    - Compile Blueprints after changes
+    - Use meaningful names for variables and functions
+    - Organize nodes logically
+    - Test functionality in isolation
+    - Consider performance implications
+    - Document complex setups
+    
+    ### Error Handling
+    - Check command responses for success
+    - Handle errors gracefully
+    - Log important operations
+    - Validate parameters
+    - Clean up resources on errors
+    """
 
 # Run the server
 if __name__ == "__main__":
