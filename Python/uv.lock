@@ -127,6 +127,20 @@ wheels = [
 ]
 
 [[package]]
+name = "fastapi"
+version = "0.115.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b5/28/c5d26e5860df807241909a961a37d45e10533acef95fc368066c7dd186cd/fastapi-0.115.11.tar.gz", hash = "sha256:cc81f03f688678b92600a65a5e618b93592c65005db37157147204d8924bf94f", size = 294441 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/5d/4d8bbb94f0dbc22732350c06965e40740f4a92ca560e90bb566f4f73af41/fastapi-0.115.11-py3-none-any.whl", hash = "sha256:32e1541b7b74602e4ef4a0260ecaf3aadf9d4f19590bba3e1bf2ac4666aa2c64", size = 94926 },
+]
+
+[[package]]
 name = "fastmcp"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -462,21 +476,25 @@ wheels = [
 
 [[package]]
 name = "unreal-mcp"
-version = "0.2.0"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "fastmcp" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "requests" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi" },
     { name = "fastmcp", specifier = ">=0.2.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
     { name = "pydantic", specifier = ">=2.6.1" },
     { name = "requests" },
+    { name = "uvicorn" },
 ]
 
 [[package]]

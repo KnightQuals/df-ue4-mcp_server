@@ -3,10 +3,10 @@
     "unrealMCP": {
       "command": "uv",
       "args": [
-        "--directory", 
-        "<path/to/your/repo/Python>", 
-        "run", 
-        "unreal_mcp_server"
+        "--directory",
+        "absolute/path/to/this/repository/Python",
+        "run",
+        "unreal_mcp_server.py"
       ]
     }
   }
