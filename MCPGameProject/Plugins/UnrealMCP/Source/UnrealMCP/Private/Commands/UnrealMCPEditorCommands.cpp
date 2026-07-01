@@ -17,7 +17,8 @@
 #include "Camera/CameraActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "EditorSubsystem.h"
-#include "Subsystems/EditorActorSubsystem.h"
+// UE4.27: EditorActorSubsystem does not exist (UE5 only); not used in this file, so removed.
+// #include "Subsystems/EditorActorSubsystem.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 

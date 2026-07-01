@@ -7,8 +7,8 @@ public class UnrealMCP : ModuleRules
 	public UnrealMCP(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		// Use IWYUSupport instead of the deprecated bEnforceIWYU in UE5.5
-		IWYUSupport = IWYUSupport.Full;
+		// UE4.27 uses bEnforceIWYU (UE5.5's IWYUSupport does not exist here)
+		bEnforceIWYU = true;
 
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -62,7 +62,7 @@ public class UnrealMCP : ModuleRules
 				{
 					"PropertyEditor",      // For widget property editing
 					"ToolMenus",           // For editor UI
-					"BlueprintEditorLibrary", // For Blueprint utilities
+					// "BlueprintEditorLibrary" removed: not available in UE4.27 (UE5 only)
 					"UMGEditor"           // For WidgetBlueprint.h and other UMG editor functionality
 				}
 			);

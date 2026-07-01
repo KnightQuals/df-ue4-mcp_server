@@ -12,7 +12,8 @@
 #include "HAL/PlatformTime.h"
 
 // Buffer size for receiving data
-const int32 BufferSize = 8192;
+// UE4.27: renamed from BufferSize to avoid shadowing a global in StringConv.h (C4459 -> error under WarningsAsErrors)
+const int32 MCPRecvBufferSize = 8192;
 
 FMCPServerRunnable::FMCPServerRunnable(UUnrealMCPBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
     : Bridge(InBridge)

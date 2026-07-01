@@ -393,7 +393,8 @@ TSharedPtr<FJsonObject> FUnrealMCPUMGCommands::HandleBindWidgetEvent(const TShar
 		float MaxHeight = 0.0f;
 		for (UEdGraphNode* Node : EventGraph->Nodes)
 		{
-			MaxHeight = FMath::Max(MaxHeight, Node->NodePosY);
+			// UE4.27: NodePosY is int32; cast to float so FMath::Max template arg is unambiguous.
+			MaxHeight = FMath::Max(MaxHeight, (float)Node->NodePosY);
 		}
 		
 		const FVector2D NodePos(200, MaxHeight + 200);

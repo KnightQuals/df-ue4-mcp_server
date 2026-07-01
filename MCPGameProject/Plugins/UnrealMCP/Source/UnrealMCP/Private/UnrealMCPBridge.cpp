@@ -49,7 +49,8 @@
 #include "K2Node_Self.h"
 #include "GameFramework/InputSettings.h"
 #include "EditorSubsystem.h"
-#include "Subsystems/EditorActorSubsystem.h"
+// UE4.27: EditorActorSubsystem does not exist (UE5 only); removed.
+// #include "Subsystems/EditorActorSubsystem.h"
 // Include our new command handler classes
 #include "Commands/UnrealMCPEditorCommands.h"
 #include "Commands/UnrealMCPBlueprintCommands.h"

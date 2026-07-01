@@ -1,20 +1,62 @@
-<div align="center">
-
-# Model Context Protocol for Unreal Engine
-<span style="color: #555555">unreal-mcp</span>
+# df-ue4-mcp_server — 基于 MCP + LLM 的 UE4.27 自动开发系统
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5%2B-orange)](https://www.unrealengine.com)
-[![Python](https://img.shields.io/badge/Python-3.12%2B-yellow)](https://www.python.org)
-[![Status](https://img.shields.io/badge/Status-Experimental-red)](https://github.com/chongdashu/unreal-mcp)
+[![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-4.27-orange)](https://www.unrealengine.com)
+[![Toolchain](https://img.shields.io/badge/Toolchain-VS2019%20(MSVC%20v142)-blue)]()
+[![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)](https://www.python.org)
 
-</div>
+> 实习课题项目。目标：基于 MCP 协议 + LLM，让 AI 自动开发 UE4.27 C++ 游戏，
+> 最终由 AI 自动实现「全面战场 MiniGame」。核心 KPI = 打通「AI 写码 → 编译 → 进引擎建蓝图 → Play」的自动闭环。
+
+## 本项目与上游的关系
+
+本仓库以开源项目 [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp)（UE5.5）为基线，
+**backport 移植到 UE4.27 + VS2019**（向 大型项目的引擎环境对齐）。
+
+- `main` 分支：UE5.5 原版留底（原生跑通的参照系）
+- `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
+
+## 当前进度
+
+- [x] 选型并在原生 UE5.5 上复现跑通，验证「外部命令 → UE 自动建对象/建蓝图」核心链路
+- [x] **backport 到 UE4.27 + VS2019**：插件 C++ 编译通过（6 处 API 适配）
+- [x] **UE4.27 运行时功能验证通过**：Actor 建/改、程序化建蓝图（create/add component/set mesh/compile/spawn）全部正常
+- [ ] W2：CLI 写码 / 编译取报错 / UE 填参 Play 三条链路各自打通
+- [ ] W2–W3：串成自动闭环（写码 → 编译 → 读错 → 自动修 → 建蓝图 → Play）
+- [ ] W3–W4：用系统自动生成「全面战场」核心玩法
+
+## 架构（三块）
+
+1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），
+   接收命令并调用引擎 API 建蓝图/改参数/spawn。← backport 的主战场。
+2. **Python MCP Server** — `Python/`，基于 FastMCP，向 AI 客户端暴露工具（JSON Schema），把工具调用翻译成 TCP 命令。
+3. **示例工程 MCPGameProject** — UE4.27 空白工程 + 已配置好的插件，用于验证。
+
+## 快速开始（UE4.27）
+
+1. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
+2. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
+3. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
+4. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
+   `scripts/blueprints/test_create_and_spawn_cube_blueprint.py`。
+
+## 已知环境注意事项（backport 踩坑记录）
+
+- **工具链**：UE4.27 需 VS2019（MSVC v142）；UE5.5 需 VS2022（v143）。二者可共存。
+- **XGE / IncrediBuild**：若 IncrediBuild 授权失效，UE4.27 会把着色器派给 XGE 并卡死。
+  解决：将 `IncrediBuild/xgConsole.exe` 改名（UE 检测不到即回退本地编译）。
+- **命名铁律**：项目名/路径/类名全程纯英文+数字（中文路径会导致 UnrealHeaderTool 乱码）。
+
+---
+
+<details>
+<summary>以下为上游 chongdashu/unreal-mcp 原始 README（保留作参考）</summary>
 
 This project enables AI assistant clients like Cursor, Windsurf and Claude Desktop to control Unreal Engine through natural language using the Model Context Protocol (MCP).
 
 ## ⚠️ Experimental Status
 
-This project is currently in an **EXPERIMENTAL** state. The API, functionality, and implementation details are subject to significant changes. While we encourage testing and feedback, please be aware that:
+This project is currently in an **EXPERIMENTAL** state (upstream note). The API, functionality, and implementation details are subject to significant changes:
 
 - Breaking changes may occur without notice
 - Features may be incomplete or unstable
@@ -153,3 +195,4 @@ MIT
 ## Questions
 
 For questions, you can reach me on X/Twitter: [@chongdashu](https://www.x.com/chongdashu)
+</details>
