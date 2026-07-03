@@ -153,6 +153,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleCreateBlueprint(const
         // Mark the package dirty
         Package->MarkPackageDirty();
 
+        // Save the newly created blueprint to disk so it can be loaded/spawned later.
+        // Without this, the asset only lives in memory and spawn_blueprint_actor
+        // (which loads the blueprint by path) reports "not found".
+        UEditorAssetLibrary::SaveLoadedAsset(NewBlueprint, false);
+
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
         ResultObj->SetStringField(TEXT("name"), AssetName);
         ResultObj->SetStringField(TEXT("path"), PackagePath + AssetName);

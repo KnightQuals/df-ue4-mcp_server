@@ -8,6 +8,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Misc/FileHelper.h"
 #include "GameFramework/Actor.h"
+#include "EngineUtils.h"
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
@@ -462,8 +463,30 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(cons
     SpawnTransform.SetRotation(FQuat(Rotation));
     SpawnTransform.SetScale3D(Scale);
 
+    // Guard against duplicate actor names. UE's low-level SpawnActor triggers a
+    // Fatal error (check) if an actor with the same name already exists in the
+    // level, which crashes the whole editor. Detect it here and return a normal
+    // error response instead of letting the engine assert.
+    if (!ActorName.IsEmpty())
+    {
+        for (TActorIterator<AActor> It(World); It; ++It)
+        {
+            if (It->GetName() == ActorName)
+            {
+                return FUnrealMCPCommonUtils::CreateErrorResponse(
+                    FString::Printf(TEXT("An actor named '%s' already exists in the level. Use a unique actor_name."), *ActorName));
+            }
+        }
+    }
+
     FActorSpawnParameters SpawnParams;
-    SpawnParams.Name = *ActorName;
+    if (!ActorName.IsEmpty())
+    {
+        SpawnParams.Name = *ActorName;
+    }
+    // If the requested name somehow still collides, ask the engine to pick a
+    // unique name rather than fataling.
+    SpawnParams.NameMode = FActorSpawnParameters::ESpawnActorNameMode::Requested;
 
     AActor* NewActor = World->SpawnActor<AActor>(Blueprint->GeneratedClass, SpawnTransform, SpawnParams);
     if (NewActor)
