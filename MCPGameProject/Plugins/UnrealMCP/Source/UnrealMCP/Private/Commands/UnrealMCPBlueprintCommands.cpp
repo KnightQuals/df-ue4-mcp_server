@@ -16,6 +16,7 @@
 #include "Engine/SCS_Node.h"
 #include "UObject/Field.h"
 #include "UObject/FieldPath.h"
+#include "UObject/UObjectIterator.h"
 #include "EditorAssetLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "GameFramework/Actor.h"
@@ -97,45 +98,79 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleCreateBlueprint(const
     // Try to find the specified parent class
     if (!ParentClass.IsEmpty())
     {
-        FString ClassName = ParentClass;
-        if (!ClassName.StartsWith(TEXT("A")))
+        // The incoming ParentClass may or may not carry the C++ prefix (A/U).
+        // The engine reflection system stores class names WITHOUT the prefix
+        // (e.g. "HelloMCPActor", not "AHelloMCPActor"), so we search by the
+        // bare name; but for a few common engine classes we still match the
+        // prefixed form for backward compatibility.
+        FString PrefixedName = ParentClass;
+        if (!PrefixedName.StartsWith(TEXT("A")))
         {
-            ClassName = TEXT("A") + ClassName;
+            PrefixedName = TEXT("A") + PrefixedName;
         }
-        
-        // First try direct StaticClass lookup for common classes
+        FString BareName = ParentClass;
+        if (BareName.StartsWith(TEXT("A")) && BareName.Len() > 1 && FChar::IsUpper(BareName[1]))
+        {
+            BareName = BareName.RightChop(1);
+        }
+
         UClass* FoundClass = nullptr;
-        if (ClassName == TEXT("APawn"))
+        if (PrefixedName == TEXT("APawn"))
         {
             FoundClass = APawn::StaticClass();
         }
-        else if (ClassName == TEXT("AActor"))
+        else if (PrefixedName == TEXT("AActor"))
         {
             FoundClass = AActor::StaticClass();
         }
         else
         {
-            // Try loading the class using LoadClass which is more reliable than FindObject
-            const FString ClassPath = FString::Printf(TEXT("/Script/Engine.%s"), *ClassName);
-            FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
-            
+            // Try loading the class from candidate script module paths, using the
+            // BARE (unprefixed) reflection name. Engine classes live under
+            // /Script/Engine; project C++ classes live under /Script/MCPGameProject.
+            // The original code only tried Engine + hardcoded "Game" AND used the
+            // prefixed name, so project classes were never found and silently fell
+            // back to AActor (blueprint reparenting to a C++ class was broken).
+            TArray<FString> CandidateModules;
+            CandidateModules.Add(TEXT("MCPGameProject"));
+            CandidateModules.Add(TEXT("Engine"));
+            CandidateModules.Add(TEXT("Game"));
+            CandidateModules.Add(TEXT("CoreUObject"));
+
+            for (const FString& ModuleName : CandidateModules)
+            {
+                const FString ClassPath = FString::Printf(TEXT("/Script/%s.%s"), *ModuleName, *BareName);
+                FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
+                if (FoundClass)
+                {
+                    break;
+                }
+            }
+
+            // Last resort: search all loaded UClasses by bare name.
             if (!FoundClass)
             {
-                // Try alternate paths if not found
-                const FString GameClassPath = FString::Printf(TEXT("/Script/Game.%s"), *ClassName);
-                FoundClass = LoadClass<AActor>(nullptr, *GameClassPath);
+                for (TObjectIterator<UClass> ClassIt; ClassIt; ++ClassIt)
+                {
+                    if ((ClassIt->GetName() == BareName || ClassIt->GetName() == PrefixedName)
+                        && ClassIt->IsChildOf(AActor::StaticClass()))
+                    {
+                        FoundClass = *ClassIt;
+                        break;
+                    }
+                }
             }
         }
 
         if (FoundClass)
         {
             SelectedParentClass = FoundClass;
-            UE_LOG(LogTemp, Log, TEXT("Successfully set parent class to '%s'"), *ClassName);
+            UE_LOG(LogTemp, Log, TEXT("Successfully set parent class to '%s' (%s)"), *BareName, *FoundClass->GetPathName());
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("Could not find specified parent class '%s' at paths: /Script/Engine.%s or /Script/Game.%s, defaulting to AActor"), 
-                *ClassName, *ClassName, *ClassName);
+            UE_LOG(LogTemp, Warning, TEXT("Could not find parent class '%s' (searched /Script/MCPGameProject, /Script/Engine, /Script/Game, and all loaded classes), defaulting to AActor"),
+                *BareName);
         }
     }
     
@@ -226,6 +261,22 @@ TSharedPtr<FJsonObject> FUnrealMCPBlueprintCommands::HandleAddComponentToBluepri
     if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown component type: %s"), *ComponentType));
+    }
+
+    // Guard against duplicate component names. Adding a second SCS node with an
+    // existing name corrupts the blueprint's construction script and causes a
+    // "Pure virtual not implemented" fatal crash on the next compile/GC.
+    // Return a recoverable error instead of crashing the editor.
+    if (Blueprint->SimpleConstructionScript)
+    {
+        for (USCS_Node* ExistingNode : Blueprint->SimpleConstructionScript->GetAllNodes())
+        {
+            if (ExistingNode && ExistingNode->GetVariableName().ToString() == ComponentName)
+            {
+                return FUnrealMCPCommonUtils::CreateErrorResponse(
+                    FString::Printf(TEXT("Component '%s' already exists on blueprint '%s'"), *ComponentName, *BlueprintName));
+            }
+        }
     }
 
     // Add the component to the blueprint
