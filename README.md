@@ -16,14 +16,39 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度
+## 当前进度（W3 收尾，2026-07-10）
 
 - [x] 选型并在原生 UE5.5 上复现跑通，验证「外部命令 → UE 自动建对象/建蓝图」核心链路
 - [x] **backport 到 UE4.27 + VS2019**：插件 C++ 编译通过（6 处 API 适配）
-- [x] **UE4.27 运行时功能验证通过**：Actor 建/改、程序化建蓝图（create/add component/set mesh/compile/spawn）全部正常
-- [ ] W2：CLI 写码 / 编译取报错 / UE 填参 Play 三条链路各自打通
-- [ ] W2–W3：串成自动闭环（写码 → 编译 → 读错 → 自动修 → 建蓝图 → Play）
-- [ ] W3–W4：用系统自动生成「全面战场」核心玩法
+- [x] **UE4.27 运行时功能验证通过**：Actor 建/改、程序化建蓝图全部正常
+- [x] **W2 三链路打通 + 合体**：CLI 写码（cli-agent + GLM-5.2）/ 编译取报错 / UE 填参 Play，cli-agent 挂 30 个 UE MCP 工具
+- [x] **修 4 个接口 bug**：create_blueprint 不落盘 / spawn 重名崩溃 / reparent 父类查找失败 / add_component 重名崩溃
+- [x] **W3 自动闭环跑通（课题 KPI 核心达成）**：`orchestrator.py` 一条命令自主「关UE → AI 写 C++ → 编译 → 报错自修 → 起 UE → MCP 建蓝图 + spawn」全链路无人值守
+- [x] **V1 占领逻辑核心验收通过**：阵营 0=攻/1=守，进度 -1/0/1 双向占领，Play 日志 `Capture progress -0.9 → +1.0` + `Sector captured by attackers!`
+- [ ] **W4 计划**：先增加 MCP 材质接口（颜色变色暴露接口边界不够）→ V1 玩法补全（出生点 / 胜负）→ V2 详细设计（DataTable / Spline / 安全区 / GameMode）→ 收尾（录 Demo + 写 wiki）
+
+详细按天记录见 `WorkLog/`。
+
+## 自动化闭环（路 B orchestrator）
+
+`orchestrator.py`（仓库根目录）是课题核心交付物——一条命令跑通完整闭环：
+
+```bash
+python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderCamp"
+```
+
+流程：关 UE → cli-agent + GLM-5.2 自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → cli-agent 用 MCP 建蓝图 + spawn。实时显示 cli-agent 的思考 / 工具调用 / 结果（stream-json 解析）。
+
+**已解决的坑**：① cli-agent Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（ACC_PRODUCT_CONFIG_V3 34 万字符撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
+
+## V1 玩法代码（MCPGameProject/Source/MCPGameProject/）
+
+| 类 | 作用 |
+|---|---|
+| `ABattleSectorAnchor` | 据点：CaptureZone 球体 + Overlap 回调 + Tick 双向占领（-1 守 / 0 中立 / 1 攻）+ 变色（ApplyAnchorColor） |
+| `ABattleCampSector` | 攻方基地（Cube 外形） |
+| `ABattleDefenderCamp` | 守方基地（Cube 外形） |
+| `ABattleSectorBase` | 区域容器（持有基地 / 据点引用 + 对局时间 + 胜负判定骨架） |
 
 ## 架构（三块）
 
