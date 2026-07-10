@@ -43,12 +43,40 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 ## V1 玩法代码（MCPGameProject/Source/MCPGameProject/）
 
-| 类 | 作用 |
-|---|---|
-| `ABattleSectorAnchor` | 据点：CaptureZone 球体 + Overlap 回调 + Tick 双向占领（-1 守 / 0 中立 / 1 攻）+ 变色（ApplyAnchorColor） |
-| `ABattleCampSector` | 攻方基地（Cube 外形） |
-| `ABattleDefenderCamp` | 守方基地（Cube 外形） |
-| `ABattleSectorBase` | 区域容器（持有基地 / 据点引用 + 对局时间 + 胜负判定骨架） |
+| 类 | 状态 | 作用 |
+|---|---|---|
+| `ABattleSectorAnchor` | ✅ 已建 + 验收 | 据点：CaptureZone 球体 + Overlap 回调 + Tick 双向占领（-1 守 / 0 中立 / 1 攻）+ 变色（ApplyAnchorColor） |
+| `ABattleCampSector` | ✅ 已建（未验收） | 攻方基地（Cube 外形） |
+| `ABattleDefenderCamp` | ✅ 已建（未验收） | 守方基地（Cube 外形） |
+| `ABattleSectorBase` | ⚠️ 骨架有未测 | 区域容器（持有基地 / 据点引用 + 对局时间 + 胜负判定骨架） |
+
+## 未来计划（Roadmap）
+
+### V1 待补（玩法完整度）
+- [ ] **出生点 `ASpawnAreaHub`**：V1 规则要求"双方阵营在自己的基地出生"——基地区域内多出生集，玩家选择/随机分配
+- [ ] **胜负判定**：`ABattleSectorBase` Tick 检查对局时间到 + `OwningTeam` 判定攻/守胜，UI 广播
+- [ ] **对局时间配置**（V1 简化版可用 C++ `UPROPERTY`，V2 用 DataTable）
+- [ ] **材质变色**（红/蓝/白）：M_AnchorColor 材质 shader 失败根因 = **MCP 接口边界不够**（无材质属性/节点连接接口），AI 无法自修，W4 先增加 MCP 材质接口解决
+
+### V2 详细设计（课题 全面战场 V2）
+- [ ] **DataTable 配置**（Key=MapID）：每行存对局时间 / 禁区倒计时 / 据点位置 / 阵营初始归属，用 DataTable 替代硬编码
+- [ ] **Spline 区域范围**：用 `USplineComponent` 制作基地 / 据点 / 交战区边界（替代 USphereComponent）
+- [ ] **安全区 / 禁区机制**：我方基地 / 据点区 = 安全区；敌方基地 / 外围 = 禁区，玩家进禁区 10s 倒计时后死亡
+- [ ] **GameMode 两种**：`AGameMode_Breakthrough`（攻防模式）+ `AGameMode_Conquest`（占领模式），共享 `AGameState` / `ADefaultPlayerController` / `ABreakthroughCharacter` / `ABattleFieldPlayerState`
+- [ ] **多人同步 Replication / RPC**：`UPROPERTY(Replicated)` + Server/Client RPC，让阵营归属 / 占领进度在多客户端同步（V2 核心难点）
+
+### MCP 接口拓展（L2 自动化系统扩展）
+**策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。
+- [ ] **材质接口**（W4 优先）：C++ 写 `UnrealMCPMaterialCommands`（`create_material` / `set_vector_parameter` / `connect_node` / `add_to_element` 等）+ Python 暴露，让 AI 自主建/改材质
+- [ ] **资产接口**：`create_asset` / `import_texture` / `set_default_material` 等（Content Browser 操作）
+- [ ] **关卡接口**：`new_level` / `save_level` / `open_level`（自动化关卡操作）
+- [ ] **DataTable 接口**：`create_data_table` / `add_row` / `read_row`（V2 配置）
+- [ ] **GameMode 接口**：`set_game_mode` / `start_match`（V2 流程）
+
+### 收尾
+- [ ] 录 Demo（一条命令跑通完整闭环视频）
+- [ ] 写 wiki 系统架构文档（mentor 要求）
+- [ ] 整理 GitHub 仓库（README 持续更新）
 
 ## 架构（三块）
 
