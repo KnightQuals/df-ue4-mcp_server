@@ -702,8 +702,50 @@ bool FUnrealMCPCommonUtils::SetObjectProperty(UObject* Object, const FString& Pr
             }
         }
     }
-    
-    OutErrorMessage = FString::Printf(TEXT("Unsupported property type: %s for property %s"), 
+    // FClassProperty (TSubclassOf<T> / raw UClass* references, e.g. WorldSettings.GameModeOverride,
+    // GameMode's TSubclassOf<APawn> DefaultPawnClass, etc). Must be checked before any FObjectProperty
+    // branch, since FClassProperty derives from FObjectProperty and would otherwise be misclassified.
+    else if (Property->IsA<FClassProperty>())
+    {
+        FClassProperty* ClassProp = CastField<FClassProperty>(Property);
+        if (ClassProp)
+        {
+            if (Value->Type != EJson::String)
+            {
+                OutErrorMessage = FString::Printf(TEXT("Expected a string class path for property %s"), *PropertyName);
+                return false;
+            }
+
+            FString ClassPath = Value->AsString();
+            if (ClassPath.IsEmpty())
+            {
+                // Allow clearing the class reference.
+                ClassProp->SetObjectPropertyValue_InContainer(Object, nullptr);
+                return true;
+            }
+
+            UClass* MetaClass = ClassProp->MetaClass ? ClassProp->MetaClass : UObject::StaticClass();
+            UClass* ClassValue = LoadClass<UObject>(nullptr, *ClassPath);
+            if (!ClassValue)
+            {
+                OutErrorMessage = FString::Printf(TEXT("Failed to load class '%s' for property %s"), *ClassPath, *PropertyName);
+                return false;
+            }
+
+            if (!ClassValue->IsChildOf(MetaClass))
+            {
+                OutErrorMessage = FString::Printf(TEXT("Class '%s' is not a valid %s for property %s"),
+                                                *ClassPath, *MetaClass->GetName(), *PropertyName);
+                return false;
+            }
+
+            ClassProp->SetObjectPropertyValue_InContainer(Object, ClassValue);
+            UE_LOG(LogTemp, Display, TEXT("Setting class property %s to: %s"), *PropertyName, *ClassPath);
+            return true;
+        }
+    }
+
+    OutErrorMessage = FString::Printf(TEXT("Unsupported property type: %s for property %s"),
                                     *Property->GetClass()->GetName(), *PropertyName);
     return false;
-} 
+}

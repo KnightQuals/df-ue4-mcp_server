@@ -22,7 +22,6 @@ void ABattleSectorBase::BeginPlay()
 
 	UE_LOG(LogTemp, Warning, TEXT("BattleSectorBase spawned (sectors=%d duration=%.0f)"), Sectors.Num(), MatchDuration);
 
-	// Auto-start the match on play for convenience.
 	StartMatch();
 }
 
@@ -31,59 +30,48 @@ void ABattleSectorBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!bMatchActive)
+	if (bMatchOver)
 	{
+		return;
+	}
+
+	// Early win check: attackers may capture every sector before time runs out.
+	if (EvaluateWinCondition())
+	{
+		bMatchOver = true;
 		return;
 	}
 
 	// Count down remaining time.
-	RemainingTime -= DeltaTime;
-	if (RemainingTime <= 0.f)
+	MatchTimeRemaining -= DeltaTime;
+	if (MatchTimeRemaining <= 0.f)
 	{
-		RemainingTime = 0.f;
-		bMatchActive = false;
+		MatchTimeRemaining = 0.f;
+		bMatchOver = true;
 
-		// Time exhausted: if attackers have not captured every sector, defenders win.
-		bool bAllCapturedByAttackers = true;
-		for (ABattleSectorAnchor* Sector : Sectors)
-		{
-			if (Sector && Sector->OwningTeam != 0)
-			{
-				bAllCapturedByAttackers = false;
-				break;
-			}
-		}
-
-		Result = bAllCapturedByAttackers ? EBattleResult::AttackersWin : EBattleResult::DefendersWin;
-		UE_LOG(LogTemp, Warning, TEXT("Match time over. Result=%s"),
-			*UEnum::GetValueAsString(Result));
-		return;
-	}
-
-	// Mid-match: check if attackers already captured every sector.
-	if (EvaluateWinCondition())
-	{
-		bMatchActive = false;
+		// Time's up: attackers win only if they hold every sector; otherwise defenders win.
+		Result = (OwningTeamHoldsAllSectors(0)) ? EBattleResult::AttackersWin : EBattleResult::DefendersWin;
+		UE_LOG(LogTemp, Warning, TEXT("Match over: %s win"),
+			Result == EBattleResult::AttackersWin ? TEXT("attackers") : TEXT("defenders"));
 	}
 }
 
 void ABattleSectorBase::StartMatch()
 {
-	RemainingTime = MatchDuration;
+	MatchTimeRemaining = MatchDuration;
 	Result = EBattleResult::InProgress;
-	bMatchActive = true;
+	bMatchOver = false;
 	UE_LOG(LogTemp, Warning, TEXT("Match started: duration=%.0f sectors=%d"), MatchDuration, Sectors.Num());
 }
 
 void ABattleSectorBase::StopMatch()
 {
-	bMatchActive = false;
+	bMatchOver = true;
 	UE_LOG(LogTemp, Warning, TEXT("Match stopped. Result=%s"), *UEnum::GetValueAsString(Result));
 }
 
-bool ABattleSectorBase::EvaluateWinCondition()
+bool ABattleSectorBase::OwningTeamHoldsAllSectors(int32 TeamId) const
 {
-	// Attackers win early if every sector is owned by team 0.
 	if (Sectors.Num() == 0)
 	{
 		return false;
@@ -91,14 +79,23 @@ bool ABattleSectorBase::EvaluateWinCondition()
 
 	for (ABattleSectorAnchor* Sector : Sectors)
 	{
-		if (!Sector || Sector->OwningTeam != 0)
+		if (!Sector || Sector->OwningTeam != TeamId)
 		{
-			return false; // at least one sector not yet captured by attackers
+			return false;
 		}
+	}
+	return true;
+}
+
+bool ABattleSectorBase::EvaluateWinCondition()
+{
+	// Attackers (team 0) win early if every sector is owned by team 0.
+	if (!OwningTeamHoldsAllSectors(0))
+	{
+		return false;
 	}
 
 	Result = EBattleResult::AttackersWin;
-	UE_LOG(LogTemp, Warning, TEXT("Attackers captured all sectors! Result=%s"),
-		*UEnum::GetValueAsString(Result));
+	UE_LOG(LogTemp, Warning, TEXT("Match over: attackers win (captured all sectors)"));
 	return true;
 }

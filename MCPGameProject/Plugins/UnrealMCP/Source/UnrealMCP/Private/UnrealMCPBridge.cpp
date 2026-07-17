@@ -58,6 +58,8 @@
 #include "Commands/UnrealMCPProjectCommands.h"
 #include "Commands/UnrealMCPCommonUtils.h"
 #include "Commands/UnrealMCPUMGCommands.h"
+#include "Commands/UnrealMCPMaterialCommands.h"
+#include "Commands/UnrealMCPDebugCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -70,6 +72,8 @@ UUnrealMCPBridge::UUnrealMCPBridge()
     BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
     ProjectCommands = MakeShared<FUnrealMCPProjectCommands>();
     UMGCommands = MakeShared<FUnrealMCPUMGCommands>();
+    MaterialCommands = MakeShared<FUnrealMCPMaterialCommands>();
+    DebugCommands = MakeShared<FUnrealMCPDebugCommands>();
 }
 
 UUnrealMCPBridge::~UUnrealMCPBridge()
@@ -79,6 +83,8 @@ UUnrealMCPBridge::~UUnrealMCPBridge()
     BlueprintNodeCommands.Reset();
     ProjectCommands.Reset();
     UMGCommands.Reset();
+    MaterialCommands.Reset();
+    DebugCommands.Reset();
 }
 
 // Initialize subsystem
@@ -278,6 +284,18 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("add_widget_to_viewport"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
+            }
+            // Material Commands
+            else if (CommandType == TEXT("create_material") ||
+                     CommandType == TEXT("add_vector_parameter") ||
+                     CommandType == TEXT("set_material_on_component"))
+            {
+                ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
+            }
+            // Debug Commands
+            else if (CommandType == TEXT("get_output_log"))
+            {
+                ResultJson = DebugCommands->HandleCommand(CommandType, Params);
             }
             else
             {

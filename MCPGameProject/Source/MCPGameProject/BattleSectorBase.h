@@ -57,17 +57,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Timing")
 	float MatchDuration = 300.f;
 
-	// Remaining match time in seconds (read-only at runtime).
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|Timing")
-	float RemainingTime = 0.f;
+	// Remaining match time in seconds (runtime-only, not edited/saved).
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Battle|Timing")
+	float MatchTimeRemaining = 0.f;
 
 	// Current match outcome.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Battle")
 	EBattleResult Result = EBattleResult::InProgress;
 
-	// Whether the match has started (timer counting down).
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle")
-	bool bMatchActive = false;
+	// True once the match has concluded (time ran out or all sectors captured); Tick stops evaluating after this.
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Battle")
+	bool bMatchOver = false;
 
 	// Begin the match: resets the timer and activates win-condition evaluation.
 	UFUNCTION(BlueprintCallable, Category = "Battle")
@@ -78,6 +78,9 @@ public:
 	void StopMatch();
 
 protected:
-	// Evaluate win/lose conditions. Returns true if the match has concluded.
+	// True if every sector in Sectors is currently owned by TeamId.
+	bool OwningTeamHoldsAllSectors(int32 TeamId) const;
+
+	// Evaluate the early-win condition (attackers captured everything). Returns true if the match has concluded.
 	bool EvaluateWinCondition();
 };

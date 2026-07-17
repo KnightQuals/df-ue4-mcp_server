@@ -16,7 +16,7 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度（W3 收尾，2026-07-10）
+## 当前进度（W4 第一周，2026-07-17）
 
 - [x] 选型并在原生 UE5.5 上复现跑通，验证「外部命令 → UE 自动建对象/建蓝图」核心链路
 - [x] **backport 到 UE4.27 + VS2019**：插件 C++ 编译通过（6 处 API 适配）
@@ -25,7 +25,12 @@
 - [x] **修 4 个接口 bug**：create_blueprint 不落盘 / spawn 重名崩溃 / reparent 父类查找失败 / add_component 重名崩溃
 - [x] **W3 自动闭环跑通（课题 KPI 核心达成）**：`orchestrator.py` 一条命令自主「关UE → AI 写 C++ → 编译 → 报错自修 → 起 UE → MCP 建蓝图 + spawn」全链路无人值守
 - [x] **V1 占领逻辑核心验收通过**：阵营 0=攻/1=守，进度 -1/0/1 双向占领，Play 日志 `Capture progress -0.9 → +1.0` + `Sector captured by attackers!`
-- [ ] **W4 计划**：先增加 MCP 材质接口（颜色变色暴露接口边界不够）→ V1 玩法补全（出生点 / 胜负）→ V2 详细设计（DataTable / Spline / 安全区 / GameMode）→ 收尾（录 Demo + 写 wiki）
+- [x] **W4 MCP 材质接口**（7/15）：`UnrealMCPMaterialCommands`（create_material / add_vector_parameter / set_material_on_component）+ Python 暴露，AI 自主建/改材质，用户 Play 确认据点变色
+- [x] **W4 FClassProperty 分支**（7/17）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等），AI 自主设 GameMode
+- [x] **W4 MCP 日志接口**（7/17）：`get_output_log`（UnrealMCPDebugCommands）读 UE 输出日志，AI 能读日志自修复（FILEREAD_AllowWrite 修复 UE 独占写）
+- [x] **W4 V1 玩法补全 C++ 类**（7/16）：SpawnAreaHub（出生点）+ BattleSectorBase 胜负判定 + BreakthroughCharacter + DefaultPlayerController + GameMode_Breakthrough，编译 0 error + MCP 建蓝图 spawn
+- [x] **W4 交付包打包验证**（7/17）：unreal-mcp-ue4.27-delivery.zip（109K，纯源码+Python+README）+ cli-agent 调通验证可靠 + 使用教程视频录制
+- [ ] **下一步**：V1 Play 完整验证（补 Character 输入映射 + Play 跑通玩家出生/占领/胜负）→ V2 详细设计（DataTable/Spline/安全区/GameMode 两种/多人同步）→ 收尾（录 Demo + 写 wiki）
 
 详细按天记录见 `WorkLog/`。
 
@@ -46,17 +51,22 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 | 类 | 状态 | 作用 |
 |---|---|---|
 | `ABattleSectorAnchor` | ✅ 已建 + 验收 | 据点：CaptureZone 球体 + Overlap 回调 + Tick 双向占领（-1 守 / 0 中立 / 1 攻）+ 变色（ApplyAnchorColor） |
-| `ABattleCampSector` | ✅ 已建（未验收） | 攻方基地（Cube 外形） |
-| `ABattleDefenderCamp` | ✅ 已建（未验收） | 守方基地（Cube 外形） |
-| `ABattleSectorBase` | ⚠️ 骨架有未测 | 区域容器（持有基地 / 据点引用 + 对局时间 + 胜负判定骨架） |
+| `ABattleCampSector` | ✅ 已建 | 攻方基地（Cube 外形） |
+| `ABattleDefenderCamp` | ✅ 已建 | 守方基地（Cube 外形） |
+| `ABattleSectorBase` | ✅ 胜负判定补全 | 区域容器（持有基地/据点引用 + MatchDuration 倒计时 + bMatchOver + 时间到判攻守胜） |
+| `ASpawnAreaHub` | ✅ 已建（7/16） | 出生点集（TArray SpawnPoints + GetRandomSpawnPoint） |
+| `ABreakthroughCharacter` | ✅ 已建（7/16） | 玩家 Character（Team 阵营 + BeginPlay UE_LOG） |
+| `ADefaultPlayerController` | ✅ 已建（7/16） | 玩家控制器（V1 空实现用引擎默认输入） |
+| `AGameMode_Breakthrough` | ✅ 已建（7/16） | GameMode（找 SpawnHub + 重写 SpawnDefaultPawnFor 调 GetRandomSpawnPoint spawn 玩家 + 分阵营） |
 
 ## 未来计划（Roadmap）
 
 ### V1 待补（玩法完整度）
-- [ ] **出生点 `ASpawnAreaHub`**：V1 规则要求"双方阵营在自己的基地出生"——基地区域内多出生集，玩家选择/随机分配
-- [ ] **胜负判定**：`ABattleSectorBase` Tick 检查对局时间到 + `OwningTeam` 判定攻/守胜，UI 广播
+- [x] **出生点 `ASpawnAreaHub`**（7/16 完成）：TArray SpawnPoints + GetRandomSpawnPoint
+- [x] **胜负判定**（7/16 完成）：ABattleSectorBase Tick 倒计时 + bMatchOver + 时间到判攻守胜
+- [x] **材质变色**（7/15 完成）：MCP 材质接口（create_material/add_vector_parameter/set_material_on_component）让 AI 自主建材质，用户 Play 确认据点变色
+- [ ] **V1 Play 完整验证**：补 Character 输入映射（InputMappingContext）+ Play 跑通玩家在 SpawnHub 出生 + 占领据点变色 + 胜负判定完整流程
 - [ ] **对局时间配置**（V1 简化版可用 C++ `UPROPERTY`，V2 用 DataTable）
-- [ ] **材质变色**（红/蓝/白）：M_AnchorColor 材质 shader 失败根因 = **MCP 接口边界不够**（无材质属性/节点连接接口），AI 无法自修，W4 先增加 MCP 材质接口解决
 
 ### V2 详细设计（课题 全面战场 V2）
 - [ ] **DataTable 配置**（Key=MapID）：每行存对局时间 / 禁区倒计时 / 据点位置 / 阵营初始归属，用 DataTable 替代硬编码
@@ -66,11 +76,14 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - [ ] **多人同步 Replication / RPC**：`UPROPERTY(Replicated)` + Server/Client RPC，让阵营归属 / 占领进度在多客户端同步（V2 核心难点）
 
 ### MCP 接口拓展（L2 自动化系统扩展）
-**策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。
-- [ ] **材质接口**（W4 优先）：C++ 写 `UnrealMCPMaterialCommands`（`create_material` / `set_vector_parameter` / `connect_node` / `add_to_element` 等）+ Python 暴露，让 AI 自主建/改材质
+**策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。三次验证成功。
+- [x] **材质接口**（7/15 完成）：`UnrealMCPMaterialCommands`（create_material / add_vector_parameter / set_material_on_component）+ Python material_tools.py
+- [x] **FClassProperty 分支**（7/17 完成）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等），改 UnrealMCPCommonUtils SetObjectProperty
+- [x] **日志接口**（7/17 完成）：`UnrealMCPDebugCommands`（get_output_log 读 UE 输出日志 + filter 过滤）+ Python debug_tools.py，FILEREAD_AllowWrite 修复 UE 独占写
 - [ ] **资产接口**：`create_asset` / `import_texture` / `set_default_material` 等（Content Browser 操作）
 - [ ] **关卡接口**：`new_level` / `save_level` / `open_level`（自动化关卡操作）
 - [ ] **DataTable 接口**：`create_data_table` / `add_row` / `read_row`（V2 配置）
+- [ ] **get_actor_properties 反射属性**：当前只返回基础 transform，要扩展返回完整反射属性（DefaultGameMode 等）
 - [ ] **GameMode 接口**：`set_game_mode` / `start_match`（V2 流程）
 
 ### 收尾
