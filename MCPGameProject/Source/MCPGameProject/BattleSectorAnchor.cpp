@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "BattleSectorAnchor.h"
+#include "Components/TextRenderComponent.h"
 
 // Sets default values
 ABattleSectorAnchor::ABattleSectorAnchor()
@@ -16,8 +17,13 @@ ABattleSectorAnchor::ABattleSectorAnchor()
 	CaptureZone->SetCollisionProfileName(TEXT("OverlapAll"));
 	CaptureZone->SetupAttachment(RootComponent);
 
-	// AnchorMesh is intentionally NOT created here: the Blueprint adds a StaticMeshComponent
-	// named "AnchorMesh" manually. Creating it in C++ as well would collide ("already exists").
+	// Floating label "CAPTURE ZONE" above the anchor, recolored on capture.
+	AreaLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("AreaLabel"));
+	AreaLabel->SetupAttachment(RootComponent);
+	AreaLabel->SetRelativeLocation(FVector(0.f, 0.f, 300.f));
+	AreaLabel->SetTextRenderColor(FColor(120, 160, 255)); // blue (defender owns by default)
+	AreaLabel->SetText(FText::FromString(TEXT("CAPTURE ZONE")));
+	AreaLabel->SetWorldSize(100.f); // bigger so it's readable from the player distance
 }
 
 // Called when the game starts or when spawned
@@ -26,6 +32,18 @@ void ABattleSectorAnchor::BeginPlay()
 	Super::BeginPlay();
 
 	UE_LOG(LogTemp, Warning, TEXT("BattleSectorAnchor spawned, team=%d radius=%.0f"), OwningTeam, CaptureRadius);
+
+	// Rotate the label to face the level center so the player reads it face-on.
+	if (AreaLabel)
+	{
+		FVector ToCenter = FVector(0.f, 0.f, 0.f) - GetActorLocation();
+		ToCenter.Z = 0.f;
+		if (!ToCenter.IsNearlyZero())
+		{
+			FRotator LookAtCenter = ToCenter.Rotation();
+			AreaLabel->SetWorldRotation(FRotator(0.f, LookAtCenter.Yaw + 180.f, 0.f));
+		}
+	}
 
 	CaptureZone->OnComponentBeginOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneBeginOverlap);
 	CaptureZone->OnComponentEndOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneEndOverlap);
@@ -191,6 +209,21 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 	for (const FName& ParamName : ColorParamNames)
 	{
 		AnchorMID->SetVectorParameterValue(ParamName, TeamColor);
+	}
+
+	// Also recolor the floating label so the capture state is readable from anywhere.
+	if (AreaLabel)
+	{
+		FColor LabelColor = FColor::White; // neutral
+		if (OwningTeam == 0)
+		{
+			LabelColor = FColor(255, 80, 80); // red = captured by attackers
+		}
+		else if (OwningTeam == 1)
+		{
+			LabelColor = FColor(80, 160, 255); // blue = defender owns
+		}
+		AreaLabel->SetTextRenderColor(LabelColor);
 	}
 }
 

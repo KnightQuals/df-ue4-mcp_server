@@ -63,7 +63,10 @@ public class UnrealMCP : ModuleRules
 					"PropertyEditor",      // For widget property editing
 					"ToolMenus",           // For editor UI
 					// "BlueprintEditorLibrary" removed: not available in UE4.27 (UE5 only)
-					"UMGEditor"           // For WidgetBlueprint.h and other UMG editor functionality
+					"UMGEditor"            // For WidgetBlueprint.h and other UMG editor functionality
+					// NOTE: material expression classes (UMaterial / UMaterialExpressionVectorParameter)
+					// live in the Engine module, which is already a dependency, so no MaterialEditing
+					// module is required. (4.27 has no "MaterialEditing" module name.)
 				}
 			);
 		}

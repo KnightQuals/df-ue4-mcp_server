@@ -9,6 +9,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "BattleSectorAnchor.generated.h"
 
+class UTextRenderComponent;
+
 UCLASS()
 class MCPGAMEPROJECT_API ABattleSectorAnchor : public AActor
 {
@@ -24,7 +26,7 @@ public:
 
 	// Radius (cm) of the capture influence sphere around this anchor.
 	UPROPERTY(EditAnywhere)
-	float CaptureRadius = 300.0f;
+	float CaptureRadius = 800.0f;
 
 	// Capture progress in [-1, 1]: -1 = defenders, 0 = neutral, 1 = attackers. Default: defenders.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -37,6 +39,10 @@ public:
 	// Sphere used to detect actors entering/leaving the capture zone.
 	UPROPERTY(VisibleAnywhere)
 	USphereComponent* CaptureZone;
+
+	// Floating 3D label above the anchor, e.g. "CAPTURE ZONE" (recolored on capture).
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UTextRenderComponent* AreaLabel;
 
 	// NOTE: The visible "AnchorMesh" StaticMeshComponent is added in the Blueprint, not in C++.
 	// It is located at runtime via FindComponentByClass<UStaticMeshComponent>() in BeginPlay.

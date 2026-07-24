@@ -13,6 +13,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/DirectionalLight.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/PointLight.h"
 #include "Engine/SpotLight.h"
 #include "Camera/CameraActor.h"
@@ -61,6 +63,12 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     else if (CommandType == TEXT("set_actor_property"))
     {
         return HandleSetActorProperty(Params);
+    }
+    // Set SkeletalMesh on an actor's SkeletalMeshComponent (Character GetMesh())
+    // so users can pick a humanoid model via MCP.
+    else if (CommandType == TEXT("set_actor_skeletal_mesh"))
+    {
+        return HandleSetActorSkeletalMesh(Params);
     }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
@@ -396,6 +404,58 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const T
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
     }
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorSkeletalMesh(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+    }
+
+    FString MeshPath;
+    if (!Params->TryGetStringField(TEXT("mesh_path"), MeshPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'mesh_path' parameter"));
+    }
+
+    AActor* TargetActor = nullptr;
+    TArray<AActor*> AllActors;
+    UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
+    for (AActor* Actor : AllActors)
+    {
+        if (Actor && Actor->GetName() == ActorName)
+        {
+            TargetActor = Actor;
+            break;
+        }
+    }
+    if (!TargetActor)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    }
+
+    // Find the SkeletalMeshComponent: any actor with a mesh works (ACharacter has GetMesh()).
+    USkeletalMeshComponent* SkelComp = TargetActor->FindComponentByClass<USkeletalMeshComponent>();
+    if (!SkelComp)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Actor has no SkeletalMeshComponent"));
+    }
+
+    USkeletalMesh* NewMesh = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+    if (!NewMesh)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load skeletal mesh: %s"), *MeshPath));
+    }
+
+    SkelComp->SetSkeletalMesh(NewMesh);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("actor"), ActorName);
+    ResultObj->SetStringField(TEXT("mesh_path"), MeshPath);
+    ResultObj->SetBoolField(TEXT("success"), true);
+    return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)

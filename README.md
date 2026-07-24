@@ -16,23 +16,27 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度（W4 第一周，2026-07-17）
+## 当前进度（W5，2026-07-24）
 
-- [x] 选型并在原生 UE5.5 上复现跑通，验证「外部命令 → UE 自动建对象/建蓝图」核心链路
-- [x] **backport 到 UE4.27 + VS2019**：插件 C++ 编译通过（6 处 API 适配）
-- [x] **UE4.27 运行时功能验证通过**：Actor 建/改、程序化建蓝图全部正常
-- [x] **W2 三链路打通 + 合体**：CLI 写码（cli-agent + GLM-5.2）/ 编译取报错 / UE 填参 Play，cli-agent 挂 30 个 UE MCP 工具
-- [x] **修 4 个接口 bug**：create_blueprint 不落盘 / spawn 重名崩溃 / reparent 父类查找失败 / add_component 重名崩溃
-- [x] **W3 自动闭环跑通（课题 KPI 核心达成）**：`orchestrator.py` 一条命令自主「关UE → AI 写 C++ → 编译 → 报错自修 → 起 UE → MCP 建蓝图 + spawn」全链路无人值守
-- [x] **V1 占领逻辑核心验收通过**：阵营 0=攻/1=守，进度 -1/0/1 双向占领，Play 日志 `Capture progress -0.9 → +1.0` + `Sector captured by attackers!`
-- [x] **W4 MCP 材质接口**（7/15）：`UnrealMCPMaterialCommands`（create_material / add_vector_parameter / set_material_on_component）+ Python 暴露，AI 自主建/改材质，用户 Play 确认据点变色
-- [x] **W4 FClassProperty 分支**（7/17）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等），AI 自主设 GameMode
-- [x] **W4 MCP 日志接口**（7/17）：`get_output_log`（UnrealMCPDebugCommands）读 UE 输出日志，AI 能读日志自修复（FILEREAD_AllowWrite 修复 UE 独占写）
-- [x] **W4 V1 玩法补全 C++ 类**（7/16）：SpawnAreaHub（出生点）+ BattleSectorBase 胜负判定 + BreakthroughCharacter + DefaultPlayerController + GameMode_Breakthrough，编译 0 error + MCP 建蓝图 spawn
-- [x] **W4 交付包打包验证**（7/17）：unreal-mcp-ue4.27-delivery.zip（109K，纯源码+Python+README）+ cli-agent 调通验证可靠 + 使用教程视频录制
-- [ ] **下一步**：V1 Play 完整验证（补 Character 输入映射 + Play 跑通玩家出生/占领/胜负）→ V2 详细设计（DataTable/Spline/安全区/GameMode 两种/多人同步）→ 收尾（录 Demo + 写 wiki）
+- [x] W4 收尾（详见 2026-07-17 进度条目）
+- [x] **W5 V1 完整多人占点逻辑**（7/24）：
+  - `ASpawnAreaHub` 加 Team UPROPERTY（0=攻方基地/1=守方基地）
+  - `AGameMode_Breakthrough` 改造为双 SpawnHub 模式（AttackerHub + DefenderHub）+ 懒查找兜底
+  - SpawnDefaultPawnFor 按玩家 Team 选对应 SpawnHub spawn
+  - PostLogin 自动 spawn 守方 AI Character（Team=1，站守方基地）—— 单人 Play 模拟多人占点
+  - BattleSectorAnchor 已实现人数比较占领（`AttackersInZone - DefendersInZone` 决定方向）
+- [x] **W5 环境修复**（7/23）：VS2019 重装 + PATH 加 UE 引擎 Binaries + EnhancedInput Binaries（修复 dll 加载 GetLastError=126）
+- [x] **W5 输入修复**（7/23）：BreakthroughCharacter 改回旧版 Input BindAxis + DefaultInput.ini 加 AxisMappings（不依赖 IMC/InputAction 资产）
+- [x] **W5 视觉化提升**（7/24）：
+  - SpawnAreaHub + BattleSectorAnchor 加 BoxComponent 线框（绿/红/蓝）+ TextRenderComponent 悬浮文字
+  - BreakthroughCharacter 加载 UE4_Mannequin + Idle 动画（Animation Starter Pack）
+  - Floor Scale=10（10000×10000 大平台）+ CaptureRadius 300→800（占领区域扩大）
+  - 文字/Mannequin BeginPlay 按位置自动旋转朝场景中心
+- [x] **W5 MCP 接口拓展**：`set_actor_skeletal_mesh`（让用户前端选 SkeletalMesh 资产设给 Character）
+- [ ] **W6 已知问题**：第一视角角色模型遮挡视野 → Camera + SpringArm 改造或 PlayerController 第一/第三人称切换
+- [ ] **W7+ V2 详细设计**（课题 全面战场 V2）：DataTable / Spline / 安全区 / GameMode 两种 / 多人同步
 
-详细按天记录见 `WorkLog/`。
+详细按天记录见 `worklog/`。
 
 ## 自动化闭环（路 B orchestrator）
 
