@@ -133,8 +133,6 @@ MCP/temp/
 # Large media files
 Content/Movies/
 Content/Audio/
-*.uasset
-*.umap
 *.mp4
 *.mp3
 *.wav
@@ -142,6 +140,17 @@ Content/Audio/
 *.tga
 *.exr
 *.hdr
+
+# Epic Marketplace assets (download separately via Epic Games Launcher)
+Content/AnimStarterPack/
+
+# Default UE level (not the game level)
+Content/Untitled.umap
+Content/Untitled_HLOD0_Instancing.uasset
+
+# Log files
+log/
+*.log
 
 # Exception for .gitkeep files
 !**/[Bb]inaries/**/.gitkeep
