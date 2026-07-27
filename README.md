@@ -104,11 +104,21 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 ## 快速开始（UE4.27）
 
-1. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
-2. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
-3. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
-4. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
+1. **clone 后下载 AnimStarterPack**（Mannequin mesh + 动画，BreakthroughCharacter 引用）：
+   - 打开 Epic Games Launcher → 商城 → 搜索 `Animation Starter Pack` → 添加到项目 → 选 MCPGameProject
+   - 或手动放到 `MCPGameProject/Content/AnimStarterPack/`（路径要对，C++ 用 `FObjectFinder` 加载 `/Game/AnimStarterPack/UE4_Mannequin/Mesh/SK_Mannequin`）
+2. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
+3. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
+4. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
+5. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
    `scripts/blueprints/test_create_and_spawn_cube_blueprint.py`。
+
+## V1 玩法验证（MainMap）
+
+1. UE 打开后，Content Browser → Maps → 双击 `MainMap` 加载（已含攻方基地/守方基地/据点/SectorBase/Floor）。
+2. WorldSettings → DefaultGameMode = `BP_GameMode_Breakthrough`（如丢失，用 MCP `set_actor_property` 重设）。
+3. ▶ Play → 攻方玩家在 SpawnHub_Attacker @ [-400,0,100] 出生 → 走到中间 Anchor_1 → 占领（红）。
+4. PostLogin 自动 spawn 守方 AI（Mannequin + Idle 动画）在守方基地。
 
 ## 已知环境注意事项（backport 踩坑记录）
 
