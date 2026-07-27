@@ -459,32 +459,92 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::ActorToJsonObject(AActor* Actor, 
     {
         return nullptr;
     }
-    
+
     TSharedPtr<FJsonObject> ActorObject = MakeShared<FJsonObject>();
     ActorObject->SetStringField(TEXT("name"), Actor->GetName());
     ActorObject->SetStringField(TEXT("class"), Actor->GetClass()->GetName());
-    
+
     FVector Location = Actor->GetActorLocation();
     TArray<TSharedPtr<FJsonValue>> LocationArray;
     LocationArray.Add(MakeShared<FJsonValueNumber>(Location.X));
     LocationArray.Add(MakeShared<FJsonValueNumber>(Location.Y));
     LocationArray.Add(MakeShared<FJsonValueNumber>(Location.Z));
     ActorObject->SetArrayField(TEXT("location"), LocationArray);
-    
+
     FRotator Rotation = Actor->GetActorRotation();
     TArray<TSharedPtr<FJsonValue>> RotationArray;
     RotationArray.Add(MakeShared<FJsonValueNumber>(Rotation.Pitch));
     RotationArray.Add(MakeShared<FJsonValueNumber>(Rotation.Yaw));
     RotationArray.Add(MakeShared<FJsonValueNumber>(Rotation.Roll));
     ActorObject->SetArrayField(TEXT("rotation"), RotationArray);
-    
+
     FVector Scale = Actor->GetActorScale3D();
     TArray<TSharedPtr<FJsonValue>> ScaleArray;
     ScaleArray.Add(MakeShared<FJsonValueNumber>(Scale.X));
     ScaleArray.Add(MakeShared<FJsonValueNumber>(Scale.Y));
     ScaleArray.Add(MakeShared<FJsonValueNumber>(Scale.Z));
     ActorObject->SetArrayField(TEXT("scale"), ScaleArray);
-    
+
+    // When bDetailed is true, also enumerate EditAnywhere/BlueprintReadWrite UPROPERTY
+    // fields via reflection so the AI can read actor state (Team, OwningTeam, CaptureProgress,
+    // MatchDuration, DefaultGameMode, etc.) — not just the transform.
+    if (bDetailed)
+    {
+        TSharedPtr<FJsonObject> PropsObj = MakeShared<FJsonObject>();
+        UClass* ActorClass = Actor->GetClass();
+        for (TFieldIterator<UProperty> It(ActorClass); It; ++It)
+        {
+            UProperty* Prop = *It;
+            if (!Prop || !Prop->HasAnyPropertyFlags(CPF_Edit | CPF_BlueprintVisible))
+            {
+                continue;
+            }
+
+            const FString PropName = Prop->GetName();
+            const void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(Actor);
+
+            // Try common property types. Unsupported types are silently skipped.
+            // UE 4.27 uses F*Property (FByteProperty, FInt32Property, etc.).
+            if (FByteProperty* ByteProp = CastField<FByteProperty>(Prop))
+            {
+                PropsObj->SetNumberField(PropName, (int32)ByteProp->GetPropertyValue(ValuePtr));
+            }
+            else if (FIntProperty* Int32Prop = CastField<FIntProperty>(Prop))
+            {
+                PropsObj->SetNumberField(PropName, Int32Prop->GetPropertyValue(ValuePtr));
+            }
+            else if (FFloatProperty* FloatProp = CastField<FFloatProperty>(Prop))
+            {
+                PropsObj->SetNumberField(PropName, FloatProp->GetPropertyValue(ValuePtr));
+            }
+            else if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Prop))
+            {
+                PropsObj->SetBoolField(PropName, BoolProp->GetPropertyValue(ValuePtr));
+            }
+            else if (FStrProperty* StrProp = CastField<FStrProperty>(Prop))
+            {
+                PropsObj->SetStringField(PropName, StrProp->GetPropertyValue(ValuePtr));
+            }
+            else if (FNameProperty* NameProp = CastField<FNameProperty>(Prop))
+            {
+                PropsObj->SetStringField(PropName, NameProp->GetPropertyValue(ValuePtr).ToString());
+            }
+            else if (FClassProperty* ClassProp = CastField<FClassProperty>(Prop))
+            {
+                UClass* ClassVal = Cast<UClass>(ClassProp->GetPropertyValue(ValuePtr));
+                PropsObj->SetStringField(PropName, ClassVal ? ClassVal->GetPathName() : TEXT("None"));
+            }
+            else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Prop))
+            {
+                UObject* ObjVal = ObjProp->GetPropertyValue(ValuePtr);
+                PropsObj->SetStringField(PropName, ObjVal ? ObjVal->GetPathName() : TEXT("None"));
+            }
+            // Vector/Struct/Array properties are skipped for brevity — AI can use
+            // the existing location/rotation/scale fields above for spatial state.
+        }
+        ActorObject->SetObjectField(TEXT("properties"), PropsObj);
+    }
+
     return ActorObject;
 }
 

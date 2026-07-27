@@ -17,4 +17,9 @@ public:
 private:
     // Specific project command handlers
     TSharedPtr<FJsonObject> HandleCreateInputMapping(const TSharedPtr<FJsonObject>& Params);
+
+    // DataTable commands (V2 config basis)
+    TSharedPtr<FJsonObject> HandleCreateDataTable(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddRow(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleReadRow(const TSharedPtr<FJsonObject>& Params);
 }; 

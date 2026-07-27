@@ -7,6 +7,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Animation/AnimSequence.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInterface.h"
@@ -16,10 +17,20 @@ ABreakthroughCharacter::ABreakthroughCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	// First-person camera attached to the capsule, positioned at eye height.
+	// The owning player views the world through this camera; the SkeletalMesh is
+	// hidden from the owner (OwnerNoSee) so it doesn't block the view, but other
+	// pawns (defender AI) still see the mannequin body.
+	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	FirstPersonCamera->SetupAttachment(GetRootComponent());
+	// Eye height ~= capsule half-height (88) + a bit, so the camera sits at the head.
+	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, 64.f));
+	FirstPersonCamera->SetRelativeRotation(FRotator::ZeroRotator);
+	// Let PawnControlPitch/Yaw drive the camera (DefaultPawn-style).
+	FirstPersonCamera->bUsePawnControlRotation = true;
+
 	// Load the UE4 Mannequin (Animation Starter Pack) and assign it to the engine's
-	// built-in SkeletalMeshComponent (GetMesh). This is the canonical character body
-	// — no extra BodyMesh cylinder needed; the SkeletalMesh shows up at the right
-	// height/rotation because Mannequin's reference pose is calibrated for ACharacter.
+	// built-in SkeletalMeshComponent (GetMesh).
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MannequinMeshFinder(
 		TEXT("/Game/AnimStarterPack/UE4_Mannequin/Mesh/SK_Mannequin"));
 	if (MannequinMeshFinder.Succeeded())
@@ -27,10 +38,12 @@ ABreakthroughCharacter::ABreakthroughCharacter()
 		if (USkeletalMeshComponent* MeshComp = GetMesh())
 		{
 			MeshComp->SetSkeletalMesh(MannequinMeshFinder.Object);
-			// Drop the mesh a bit so its feet sit at the capsule's base (UE4 Mannequin
-			// is authored with its origin at the root, which is roughly the pelvis).
+			// Drop the mesh so its feet sit at the capsule's base.
 			MeshComp->SetRelativeLocation(FVector(0.f, 0.f, -90.f));
 			MeshComp->SetVisibility(true);
+			// Hide the mesh from the owning player so it doesn't occlude the camera.
+			// Other pawns (defender AI, multiplayer clients) still see this body.
+			MeshComp->SetOwnerNoSee(true);
 		}
 	}
 }

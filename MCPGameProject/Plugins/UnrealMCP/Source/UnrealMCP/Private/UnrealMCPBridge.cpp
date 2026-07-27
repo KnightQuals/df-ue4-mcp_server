@@ -231,17 +231,21 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                 ResultJson->SetStringField(TEXT("message"), TEXT("pong"));
             }
             // Editor Commands (including actor manipulation)
-            else if (CommandType == TEXT("get_actors_in_level") || 
+            else if (CommandType == TEXT("get_actors_in_level") ||
                      CommandType == TEXT("find_actors_by_name") ||
                      CommandType == TEXT("spawn_actor") ||
                      CommandType == TEXT("create_actor") ||
-                     CommandType == TEXT("delete_actor") || 
+                     CommandType == TEXT("delete_actor") ||
                      CommandType == TEXT("set_actor_transform") ||
                      CommandType == TEXT("get_actor_properties") ||
                      CommandType == TEXT("set_actor_property") ||
+                     CommandType == TEXT("set_actor_skeletal_mesh") ||
                      CommandType == TEXT("spawn_blueprint_actor") ||
-                     CommandType == TEXT("focus_viewport") || 
-                     CommandType == TEXT("take_screenshot"))
+                     CommandType == TEXT("focus_viewport") ||
+                     CommandType == TEXT("take_screenshot") ||
+                     CommandType == TEXT("save_level") ||
+                     CommandType == TEXT("new_level") ||
+                     CommandType == TEXT("open_level"))
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
             }
@@ -271,7 +275,10 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }
             // Project Commands
-            else if (CommandType == TEXT("create_input_mapping"))
+            else if (CommandType == TEXT("create_input_mapping") ||
+                     CommandType == TEXT("create_data_table") ||
+                     CommandType == TEXT("add_row") ||
+                     CommandType == TEXT("read_row"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }

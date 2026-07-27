@@ -7,6 +7,7 @@
 #include "BreakthroughCharacter.generated.h"
 
 class UStaticMeshComponent;
+class UCameraComponent;
 
 // Forward declarations for Enhanced Input assets.
 class UInputMappingContext;
@@ -25,12 +26,12 @@ public:
 	// Sets default values for this character's properties
 	ABreakthroughCharacter();
 
-	// Visible body mesh (cylinder torso, colored by Team in BeginPlay).
-	// The user assigns a SkeletalMesh in the Blueprint (or via MCP) so the
-	// character gets a proper humanoid model — this fallback cylinder only
-	// shows if no SkeletalMesh is set (so defender AI is at least visible).
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle")
-	UStaticMeshComponent* BodyMesh;
+	// First-person camera attached to the capsule, positioned at eye height (~1.7m).
+	// Player sees the world through this camera; the SkeletalMesh is hidden from the
+	// owning player (OwnerNoSee) so it doesn't occlude the view, but other players
+	// (and the defender AI pawn) still see the mannequin body.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	UCameraComponent* FirstPersonCamera;
 
 	// Team this character belongs to: 0 = attackers, 1 = defenders.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")

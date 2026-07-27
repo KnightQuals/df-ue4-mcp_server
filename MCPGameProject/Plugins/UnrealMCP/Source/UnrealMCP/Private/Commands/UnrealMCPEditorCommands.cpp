@@ -18,6 +18,10 @@
 #include "Engine/PointLight.h"
 #include "Engine/SpotLight.h"
 #include "Camera/CameraActor.h"
+#include "Editor/EditorEngine.h"
+#include "FileHelpers.h"
+#include "LevelEditor.h"
+#include "LevelEditorActions.h"
 #include "Components/StaticMeshComponent.h"
 #include "EditorSubsystem.h"
 // UE4.27: EditorActorSubsystem does not exist (UE5 only); not used in this file, so removed.
@@ -69,6 +73,19 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     else if (CommandType == TEXT("set_actor_skeletal_mesh"))
     {
         return HandleSetActorSkeletalMesh(Params);
+    }
+    // Level management commands
+    else if (CommandType == TEXT("save_level"))
+    {
+        return HandleSaveLevel(Params);
+    }
+    else if (CommandType == TEXT("new_level"))
+    {
+        return HandleNewLevel(Params);
+    }
+    else if (CommandType == TEXT("open_level"))
+    {
+        return HandleOpenLevel(Params);
     }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
@@ -455,6 +472,90 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorSkeletalMesh(con
     ResultObj->SetStringField(TEXT("actor"), ActorName);
     ResultObj->SetStringField(TEXT("mesh_path"), MeshPath);
     ResultObj->SetBoolField(TEXT("success"), true);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSaveLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    // Save the current level. If 'path' is provided, save as that path; otherwise
+    // save in place (or prompt if the level has no path yet).
+    FString SavePath;
+    Params->TryGetStringField(TEXT("path"), SavePath);
+
+    UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+    if (!World)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("No editor world available"));
+    }
+
+    bool bSaved = false;
+    if (!SavePath.IsEmpty())
+    {
+        // Save As — the path should be like "/Game/Maps/MyMap"
+        bSaved = UEditorLoadingAndSavingUtils::SaveMap(World, *SavePath);
+    }
+    else
+    {
+        // Save in place
+        bSaved = UEditorLoadingAndSavingUtils::SaveCurrentLevel();
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), bSaved);
+    ResultObj->SetStringField(TEXT("level"), World->GetName());
+    ResultObj->SetStringField(TEXT("path"), SavePath.IsEmpty() ? World->GetPathName() : SavePath);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleNewLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    // Create a new empty level and save it at the given asset path, e.g. "/Game/Maps/NewMap"
+    FString LevelPath;
+    if (!Params->TryGetStringField(TEXT("path"), LevelPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'path' parameter (e.g. /Game/Maps/NewMap)"));
+    }
+
+    // NewBlankMap(bool bSaveExistingMap) — creates a fresh blank map, returns the new world.
+    UWorld* NewWorld = UEditorLoadingAndSavingUtils::NewBlankMap(true);
+    if (!NewWorld)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create new blank level"));
+    }
+
+    // Save the new map to the requested asset path so it actually persists.
+    bool bSaved = UEditorLoadingAndSavingUtils::SaveMap(NewWorld, LevelPath);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), bSaved);
+    ResultObj->SetStringField(TEXT("level"), NewWorld->GetName());
+    ResultObj->SetStringField(TEXT("path"), LevelPath);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleOpenLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    // Open an existing level by asset path, e.g. "/Game/Maps/MainMap"
+    FString LevelPath;
+    if (!Params->TryGetStringField(TEXT("path"), LevelPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'path' parameter (e.g. /Game/Maps/MainMap)"));
+    }
+
+    if (!FPackageName::DoesPackageExist(LevelPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Level not found: %s"), *LevelPath));
+    }
+
+    UWorld* Loaded = UEditorLoadingAndSavingUtils::LoadMap(LevelPath);
+    if (!Loaded)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load level: %s"), *LevelPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("path"), LevelPath);
     return ResultObj;
 }
 
