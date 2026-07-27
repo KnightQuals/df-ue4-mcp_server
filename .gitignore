@@ -142,11 +142,11 @@ Content/Audio/
 *.hdr
 
 # Epic Marketplace assets (download separately via Epic Games Launcher)
-Content/AnimStarterPack/
+MCPGameProject/Content/AnimStarterPack/
 
 # Default UE level (not the game level)
-Content/Untitled.umap
-Content/Untitled_HLOD0_Instancing.uasset
+MCPGameProject/Content/Untitled.umap
+MCPGameProject/Content/Untitled_HLOD0_Instancing.uasset
 
 # Log files
 log/
