@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "BattleSectorAnchor.generated.h"
@@ -21,7 +21,8 @@ public:
 	ABattleSectorAnchor();
 
 	// Owning team: 0 = attackers, 1 = defenders. Default: defenders own the sector.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	// Replicated with OnRep so clients recolor the anchor when ownership changes.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_OwningTeam)
 	int32 OwningTeam = 1;
 
 	// Radius (cm) of the capture influence sphere around this anchor.
@@ -29,16 +30,19 @@ public:
 	float CaptureRadius = 800.0f;
 
 	// Capture progress in [-1, 1]: -1 = defenders, 0 = neutral, 1 = attackers. Default: defenders.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	// Replicated so clients can show a progress bar / debug value if desired.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
 	float CaptureProgress = -1.f;
 
 	// Capture progress per second of advantage (|attackers - defenders| in zone).
 	UPROPERTY(EditAnywhere)
 	float CaptureSpeed = 1.f;
 
-	// Sphere used to detect actors entering/leaving the capture zone.
+	// Box trigger used to detect actors entering/leaving the capture zone. Smaller
+	// than the 8m sphere (so the SpawnHubs 4m away don't overlap the trigger) and
+	// axis-aligned so the trigger area is predictable.
 	UPROPERTY(VisibleAnywhere)
-	USphereComponent* CaptureZone;
+	UBoxComponent* CaptureZone;
 
 	// Floating 3D label above the anchor, e.g. "CAPTURE ZONE" (recolored on capture).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -50,6 +54,13 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	// Replication.
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// Called on clients when OwningTeam replicates — recolors the anchor + label.
+	UFUNCTION()
+	void OnRep_OwningTeam();
 
 	UFUNCTION()
 	void OnCaptureZoneBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);

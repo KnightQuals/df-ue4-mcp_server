@@ -1,7 +1,23 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "BattleSectorAnchor.h"
+#include "BreakthroughCharacter.h"
 #include "Components/TextRenderComponent.h"
+#include "Components/BoxComponent.h"
+#include "Net/UnrealNetwork.h"
+
+void ABattleSectorAnchor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ABattleSectorAnchor, OwningTeam);
+	DOREPLIFETIME(ABattleSectorAnchor, CaptureProgress);
+}
+
+void ABattleSectorAnchor::OnRep_OwningTeam()
+{
+	// Clients recolor the anchor when the server replicates a new owning team.
+	ApplyAnchorColor();
+}
 
 // Sets default values
 ABattleSectorAnchor::ABattleSectorAnchor()
@@ -9,11 +25,18 @@ ABattleSectorAnchor::ABattleSectorAnchor()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	// Replicate so clients see the anchor's ownership/color changes in multiplayer.
+	bReplicates = true;
+
 	USceneComponent* DefaultSceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultSceneRoot"));
 	RootComponent = DefaultSceneRoot;
 
-	CaptureZone = CreateDefaultSubobject<USphereComponent>(TEXT("CaptureZone"));
-	CaptureZone->SetSphereRadius(CaptureRadius);
+	// Box trigger zone (not a sphere) so it doesn't bleed into the SpawnHubs
+	// (spawn hubs are 4m away on each side; a 8m sphere would overlap them).
+	// BoxExtent = half-size in cm: 300x300x100 = 6m x 6m x 2m box centred on the anchor.
+	// SpawnHubs are 4m away (at ±400cm) so a 6m box (radius 3m) still doesn't overlap them.
+	CaptureZone = CreateDefaultSubobject<UBoxComponent>(TEXT("CaptureZone"));
+	CaptureZone->SetBoxExtent(FVector(800.f, 800.f, 200.f)); // 16m × 16m × 4m (enlarged)
 	CaptureZone->SetCollisionProfileName(TEXT("OverlapAll"));
 	CaptureZone->SetupAttachment(RootComponent);
 
@@ -33,20 +56,43 @@ void ABattleSectorAnchor::BeginPlay()
 
 	UE_LOG(LogTemp, Warning, TEXT("BattleSectorAnchor spawned, team=%d radius=%.0f"), OwningTeam, CaptureRadius);
 
-	// Rotate the label to face the level center so the player reads it face-on.
+	// Rotate the label to face the attacker (-X) by default. TextRenderComponent's
+	// default normal is +X; a 180° yaw makes the text face -X, so the player walking
+	// in from the attacker base sees the text face-on (not mirror-flipped).
 	if (AreaLabel)
 	{
-		FVector ToCenter = FVector(0.f, 0.f, 0.f) - GetActorLocation();
-		ToCenter.Z = 0.f;
-		if (!ToCenter.IsNearlyZero())
+		AreaLabel->SetWorldRotation(FRotator(0.f, 180.f, 0.f));
+	}
+
+	// Bind overlap events. If the Blueprint still holds a stale/invalid CaptureZone
+	// (leftover from the C++ SphereComponent → BoxComponent refactor), the component
+	// template can deserialize as null/invalid. Rather than depend on the user
+	// recompiling the Blueprint, we create a fresh BoxComponent at runtime here so the
+	// capture trigger always works regardless of the Blueprint's serialized state.
+	if (!CaptureZone || !CaptureZone->IsValidLowLevelFast())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CaptureZone invalid — creating a runtime BoxComponent trigger."));
+		UBoxComponent* NewZone = NewObject<UBoxComponent>(this, TEXT("CaptureZone_Runtime"));
+		if (NewZone)
 		{
-			FRotator LookAtCenter = ToCenter.Rotation();
-			AreaLabel->SetWorldRotation(FRotator(0.f, LookAtCenter.Yaw + 180.f, 0.f));
+			NewZone->RegisterComponent();
+			NewZone->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+			NewZone->SetBoxExtent(FVector(800.f, 800.f, 200.f)); // 16m × 16m × 4m (enlarged)
+			NewZone->SetCollisionProfileName(TEXT("OverlapAll"));
+			CaptureZone = NewZone;
 		}
 	}
 
-	CaptureZone->OnComponentBeginOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneBeginOverlap);
-	CaptureZone->OnComponentEndOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneEndOverlap);
+	if (CaptureZone && CaptureZone->IsValidLowLevelFast())
+	{
+		CaptureZone->OnComponentBeginOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneBeginOverlap);
+		CaptureZone->OnComponentEndOverlap.AddDynamic(this, &ABattleSectorAnchor::OnCaptureZoneEndOverlap);
+		UE_LOG(LogTemp, Warning, TEXT("CaptureZone overlap events bound OK."));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("CaptureZone still invalid after runtime creation — capture disabled."));
+	}
 
 	// The visible mesh is added in the Blueprint (named "AnchorMesh"). Iterate all
 	// StaticMeshComponents on this actor, log each (so we can see what's there), and only
@@ -95,6 +141,11 @@ void ABattleSectorAnchor::BeginPlay()
 
 void ABattleSectorAnchor::OnCaptureZoneBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	// Only the server tracks the in-zone headcount (authoritative capture state).
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (!OtherActor)
 	{
 		return;
@@ -113,6 +164,11 @@ void ABattleSectorAnchor::OnCaptureZoneBeginOverlap(UPrimitiveComponent* Overlap
 
 void ABattleSectorAnchor::OnCaptureZoneEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
+	// Server-authoritative headcount only.
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (!OtherActor)
 	{
 		return;
@@ -133,6 +189,14 @@ void ABattleSectorAnchor::OnCaptureZoneEndOverlap(UPrimitiveComponent* Overlappe
 void ABattleSectorAnchor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Capture progression is authoritative: only the server advances CaptureProgress
+	// and flips OwningTeam. The replicated OwningTeam + OnRep_OwningTeam recolors
+	// clients automatically, so we don't run this logic on clients.
+	if (!HasAuthority())
+	{
+		return;
+	}
 
 	// Bidirectional capture: progress drifts toward whichever side outnumbers the other.
 	const int32 Advantage = AttackersInZone - DefendersInZone;
@@ -234,8 +298,16 @@ int32 ABattleSectorAnchor::GetActorTeam_Implementation(AActor* OtherActor) const
 		return -1;
 	}
 
-	// Heuristic default: classify by actor name substring so it works without a team interface.
-	// Subclasses/blueprints should override GetActorTeam to plug in a real team system.
+	// Prefer the real Team property on BreakthroughCharacter (0 = attacker, 1 = defender).
+	// This is more reliable than name matching — the player pawn is named
+	// "BP_BreakthroughCharacter_C_0" (no "Attacker"/"Defender" substring), so the old
+	// name heuristic returned the fallback for the player, which could be wrong.
+	if (const ABreakthroughCharacter* Char = Cast<ABreakthroughCharacter>(OtherActor))
+	{
+		return Char->Team;
+	}
+
+	// Fallback: classify by actor name substring for non-character actors.
 	const FString Name = OtherActor->GetName();
 	if (Name.Contains(TEXT("Attacker")))
 	{
@@ -245,7 +317,6 @@ int32 ABattleSectorAnchor::GetActorTeam_Implementation(AActor* OtherActor) const
 	{
 		return 1;
 	}
-	// V1: treat unknown actors as attackers (team 0) so player entering the range
-	// triggers capture progress even before a real team system is wired up.
+	// Unknown actors: treat as attackers (team 0) so the player triggers capture.
 	return 0;
 }

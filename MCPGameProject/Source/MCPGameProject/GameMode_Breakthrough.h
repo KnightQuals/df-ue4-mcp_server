@@ -43,6 +43,11 @@ protected:
 	// Called after a player joins the game.
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 
+	// Deferred AI-defender spawn: called ~1.5s after the first login so we can tell
+	// whether a 2nd human player is joining (multiplayer) before deciding to spawn AI.
+	UFUNCTION()
+	void TrySpawnDefenderAI();
+
 	// Spawn the pawn for a new player, alternating attacker/defender team assignment.
 	virtual APawn* SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot) override;
 
@@ -51,4 +56,7 @@ protected:
 
 	// True after we spawned the defender AI dummy (V1 single-player simulation of attackers vs defenders).
 	bool bDefenderAISpawned = false;
+
+	// True once the deferred AI-spawn timer has been armed (so we only arm it once).
+	bool bAISpawnTimerArmed = false;
 };

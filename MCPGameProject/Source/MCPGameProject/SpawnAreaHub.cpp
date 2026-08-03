@@ -19,7 +19,7 @@ ASpawnAreaHub::ASpawnAreaHub()
 	// via ShapeColor in BeginPlay. No collision — pure visual.
 	AreaBox = CreateDefaultSubobject<UBoxComponent>(TEXT("AreaBox"));
 	AreaBox->SetupAttachment(RootComponent);
-	AreaBox->SetBoxExtent(FVector(300.f, 300.f, 200.f)); // 6m × 6m × 4m box
+	AreaBox->SetBoxExtent(FVector(1500.f, 1500.f, 300.f)); // 30m × 30m × 6m box (enlarged 3x for环境装饰)
 	AreaBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AreaBox->SetHiddenInGame(false);
 	AreaBox->ShapeColor = FColor(120, 220, 120); // green default; recolored in BeginPlay
@@ -42,16 +42,12 @@ void ASpawnAreaHub::BeginPlay()
 	// Set label text + color by team so the player can read which base they're near.
 	if (AreaLabel)
 	{
-		// TextRenderComponent default faces world +X; rotate so its +X axis points TOWARD
-		// the level center, so the player sees the text face-on (not mirror-flipped).
-		FVector ToCenter = FVector(0.f, 0.f, 0.f) - GetActorLocation();
-		ToCenter.Z = 0.f;
-		if (!ToCenter.IsNearlyZero())
-		{
-			FRotator LookAtCenter = ToCenter.Rotation();
-			// Rotate the LABEL (not the whole actor) so the wireframe box stays axis-aligned.
-			AreaLabel->SetWorldRotation(FRotator(0.f, LookAtCenter.Yaw + 180.f, 0.f));
-		}
+		// Default the label to face the attacker (-X). TextRenderComponent's default
+		// normal is +X; a 180° yaw flips the text to face -X, so the player walking in
+		// from the attacker side sees the text face-on (no mirror-flip). DEFENDER BASE
+		// also defaults to face-on toward the attacker so the player can read it from
+		// across the map without the wireframe box obscuring it.
+		AreaLabel->SetWorldRotation(FRotator(0.f, 180.f, 0.f));
 
 		if (Team == 0)
 		{

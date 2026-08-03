@@ -34,7 +34,8 @@ public:
 	UCameraComponent* FirstPersonCamera;
 
 	// Team this character belongs to: 0 = attackers, 1 = defenders.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")
+	// Replicated so clients know each pawn's team for capture logic + visuals.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle")
 	int32 Team = 0;
 
 	// 保留 UPROPERTY 兼容 BP_BreakthroughCharacter 蓝图变量引用（不实际使用）
@@ -47,9 +48,35 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	UInputAction* LookAction = nullptr;
 
+	// ===== Defender AI patrol (C++ simple patrol, no NavMesh/BT needed) =====
+	// When true, this character wanders inside PatrolRadius around PatrolCenter.
+	// Set automatically in BeginPlay for non-player defender pawns (Team == 1).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patrol")
+	bool bIsPatrolling = false;
+
+	// Centre of the patrol area (defaults to spawn location; GameMode sets it to the
+	// defender SpawnHub position so the AI stays near its base).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patrol")
+	FVector PatrolCenter = FVector::ZeroVector;
+
+	// Half-extent of the patrol box around PatrolCenter (cm). Default 500 = 10m × 10m.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patrol")
+	float PatrolRadius = 500.f;
+
+	// ===== Player sprint (Shift to run, FPS-style) =====
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float NormalSpeed = 400.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float SprintSpeed = 800.f;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+
+	// Replication: expose Team to clients.
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -59,4 +86,23 @@ protected:
 	void MoveRight(float Value);
 	void LookUp(float Value);
 	void Turn(float Value);
+
+	// Sprint (Shift): raise/lower MaxWalkSpeed.
+	void StartSprint();
+	void StopSprint();
+
+	// ===== Patrol internals =====
+	// Current patrol destination; when reached (or after PatrolWaitTime), pick a new one.
+	FVector PatrolTarget = FVector::ZeroVector;
+	// Cooldown timer before picking the next patrol target (seconds).
+	float PatrolWaitTimer = 0.f;
+	// Cached idle/walk AnimSequence references so we don't LoadObject every tick.
+	class UAnimSequence* IdleAnimAsset = nullptr;
+	class UAnimSequence* WalkAnimAsset = nullptr;
+	bool bPatrolAnimIsWalk = false; // tracks which anim is currently playing
+
+	// Pick a new random patrol target inside the box around PatrolCenter.
+	void PickNewPatrolTarget();
+	// Play walk anim if moving, idle anim if not.
+	void UpdatePatrolAnim(bool bMoving);
 };

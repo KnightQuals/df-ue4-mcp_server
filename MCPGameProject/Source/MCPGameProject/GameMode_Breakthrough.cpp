@@ -8,6 +8,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 
 AGameMode_Breakthrough::AGameMode_Breakthrough()
 {
@@ -115,11 +117,33 @@ void AGameMode_Breakthrough::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// V1 single-player simulation: spawn 1 defender AI character at the defender spawn hub
-	// (NOT inside the anchor) so attackers walking into the anchor zone get attacker > defender
-	// headcount and can capture. Place it at the defender hub + a small Z offset so it drops onto Floor.
+	// Defer the AI-defender decision by 1.5s: in 2-player PIE both humans join within
+	// a fraction of a second, so after a short delay GetNumPlayers() tells us reliably
+	// whether this is single-player (spawn AI defender) or multiplayer (skip AI, the
+	// 2nd human is the defender). Only arm the timer once.
+	if (bDefenderAISpawned || bAISpawnTimerArmed)
+	{
+		return;
+	}
+	bAISpawnTimerArmed = true;
+
+	FTimerHandle TimerHandle;
+	GetWorldTimerManager().SetTimer(TimerHandle, this, &AGameMode_Breakthrough::TrySpawnDefenderAI, 1.5f, false);
+}
+
+void AGameMode_Breakthrough::TrySpawnDefenderAI()
+{
 	if (bDefenderAISpawned)
 	{
+		return;
+	}
+
+	// If 2+ humans are connected, they fill both teams — no AI defender needed.
+	const int32 NumPlayers = GetNumPlayers();
+	if (NumPlayers >= 2)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TrySpawnDefenderAI: %d players — multiplayer, skipping AI."), NumPlayers);
+		bDefenderAISpawned = true;
 		return;
 	}
 
@@ -141,7 +165,7 @@ void AGameMode_Breakthrough::PostLogin(APlayerController* NewPlayer)
 		}
 		if (SpawnLocation.IsNearlyZero())
 		{
-			SpawnLocation = FVector(400.f, 0.f, 100.f);
+			SpawnLocation = FVector(3000.f, 0.f, 100.f);
 		}
 	}
 
@@ -153,7 +177,10 @@ void AGameMode_Breakthrough::PostLogin(APlayerController* NewPlayer)
 	if (DefenderAI)
 	{
 		DefenderAI->Team = 1;
+		DefenderAI->PatrolCenter = SpawnLocation;
+		DefenderAI->PatrolRadius = 1200.f; // 24m box, inside the 30m SpawnHub area
 		bDefenderAISpawned = true;
-		UE_LOG(LogTemp, Warning, TEXT("PostLogin: spawned defender AI at %s"), *SpawnLocation.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("TrySpawnDefenderAI: spawned defender AI at %s (single-player)"),
+			*SpawnLocation.ToString());
 	}
 }

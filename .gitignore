@@ -169,3 +169,12 @@ Backup/
 #
 UNREAL/Source/
 UNREAL/SOURCE/
+
+# 大型外部资源包(Epic Vault下载,不入库,参考AnimStarterPack处理方式)
+MCPGameProject/Content/KiteDemo/
+
+# 关卡备份(工作区外备份目录)
+MAP/
+
+# 编译日志
+build*.log

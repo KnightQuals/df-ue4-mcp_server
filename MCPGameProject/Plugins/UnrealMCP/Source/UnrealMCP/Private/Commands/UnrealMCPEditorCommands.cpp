@@ -206,7 +206,11 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
     }
 
     FActorSpawnParameters SpawnParams;
-    SpawnParams.Name = *ActorName;
+    // Use Requested name mode: if the name is already taken, UE auto-appends a suffix
+    // instead of crashing (LevelActor.cpp:417 Fatal error on duplicate FName). We also
+    // set the actor's editor label separately below so it's still identifiable.
+    SpawnParams.Name = MakeUniqueObjectName(World, AStaticMeshActor::StaticClass(), *ActorName);
+    SpawnParams.NameMode = FActorSpawnParameters::ESpawnActorNameMode::Requested;
 
     if (ActorType == TEXT("StaticMeshActor"))
     {
@@ -235,10 +239,36 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
 
     if (NewActor)
     {
+        // Give the actor a readable editor label matching the requested name.
+        NewActor->SetActorLabel(ActorName);
+
         // Set scale (since SpawnActor only takes location and rotation)
         FTransform Transform = NewActor->GetTransform();
         Transform.SetScale3D(Scale);
         NewActor->SetActorTransform(Transform);
+
+        // Optional: if a 'mesh_path' is provided and this is a StaticMeshActor,
+        // load and assign the StaticMesh so we can spawn real environment assets
+        // (e.g. KiteDemo trees/rocks) via MCP, not just empty actors.
+        FString MeshPath;
+        if (Params->TryGetStringField(TEXT("mesh_path"), MeshPath) && !MeshPath.IsEmpty())
+        {
+            if (AStaticMeshActor* SMActor = Cast<AStaticMeshActor>(NewActor))
+            {
+                UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath);
+                if (Mesh && SMActor->GetStaticMeshComponent())
+                {
+                    // StaticMeshActor's mesh component is static by default; make it
+                    // movable so SetStaticMesh at runtime/editor time is allowed.
+                    SMActor->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+                    SMActor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("spawn_actor: mesh not found at %s"), *MeshPath);
+                }
+            }
+        }
 
         // Return the created actor's details
         return FUnrealMCPCommonUtils::ActorToJsonObject(NewActor, true);
