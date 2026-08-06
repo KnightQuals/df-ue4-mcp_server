@@ -53,6 +53,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Sectors")
 	TArray<ABattleSectorAnchor*> Sectors;
 
+	// V2 Breakthrough: objectives are unlocked in SectorIndex order. Attackers must
+	// capture the current sector before the next one becomes active.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Breakthrough")
+	bool bUseSequentialSectors = true;
+
+	// Runtime index into the sorted Sectors array. Exposed for HUD/debug/readback.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "V2|Breakthrough")
+	int32 ActiveSectorArrayIndex = 0;
+
 	// Total match duration in seconds.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Timing")
 	float MatchDuration = 300.f;
@@ -80,6 +89,13 @@ public:
 protected:
 	// True if every sector in Sectors is currently owned by TeamId.
 	bool OwningTeamHoldsAllSectors(int32 TeamId) const;
+
+	// Discover/sort anchors by SectorIndex and lock all future sectors.
+	void InitializeSequentialSectors();
+
+	// Advances the active objective after attackers capture it. Returns true only when
+	// attackers captured the final sector and the match should end.
+	bool UpdateSequentialProgression();
 
 	// Evaluate the early-win condition (attackers captured everything). Returns true if the match has concluded.
 	bool EvaluateWinCondition();

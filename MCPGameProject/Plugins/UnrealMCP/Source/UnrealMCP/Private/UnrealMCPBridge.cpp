@@ -245,7 +245,8 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("take_screenshot") ||
                      CommandType == TEXT("save_level") ||
                      CommandType == TEXT("new_level") ||
-                     CommandType == TEXT("open_level"))
+                     CommandType == TEXT("open_level") ||
+                     CommandType == TEXT("duplicate_level"))
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
             }

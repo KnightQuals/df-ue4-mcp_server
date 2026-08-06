@@ -4,6 +4,11 @@
 #include "Engine/DataTable.h"
 #include "UObject/StructOnScope.h"
 #include "JsonObjectConverter.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
+#include "Factories/DataTableFactory.h"
+#include "EditorAssetLibrary.h"
+#include "Misc/PackageName.h"
 
 FUnrealMCPProjectCommands::FUnrealMCPProjectCommands()
 {
@@ -106,12 +111,36 @@ TSharedPtr<FJsonObject> FUnrealMCPProjectCommands::HandleCreateDataTable(const T
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Row struct not found: %s"), *StructPath));
     }
 
-    UDataTable* NewTable = NewObject<UDataTable>(GetTransientPackage(), FName(*AssetPath));
+    // Previous implementation used GetTransientPackage(), which returned success but
+    // created an unsaved, unfindable table. Create the asset through AssetTools so it
+    // appears under Content Browser and can be loaded by GameMode after an editor restart.
+    const FString PackagePath = FPackageName::GetLongPackagePath(AssetPath);
+    const FString AssetName = FPackageName::GetLongPackageAssetName(AssetPath);
+    if (PackagePath.IsEmpty() || AssetName.IsEmpty())
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Invalid asset_path: %s"), *AssetPath));
+    }
+
+    UDataTable* NewTable = LoadObject<UDataTable>(nullptr, *FString::Printf(TEXT("%s.%s"), *AssetPath, *AssetName));
     if (!NewTable)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create UDataTable"));
+        UDataTableFactory* Factory = NewObject<UDataTableFactory>();
+        Factory->Struct = RowStruct;
+        FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
+        NewTable = Cast<UDataTable>(AssetToolsModule.Get().CreateAsset(AssetName, PackagePath, UDataTable::StaticClass(), Factory));
     }
+
+    if (!NewTable)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create persistent UDataTable asset"));
+    }
+
     NewTable->RowStruct = RowStruct;
+    NewTable->MarkPackageDirty();
+    if (!UEditorAssetLibrary::SaveLoadedAsset(NewTable, false))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("DataTable created but failed to save: %s"), *AssetPath));
+    }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
@@ -157,6 +186,11 @@ TSharedPtr<FJsonObject> FUnrealMCPProjectCommands::HandleAddRow(const TSharedPtr
     }
     Table->AddRow(FName(*RowName), *reinterpret_cast<FTableRowBase*>(RowData));
     FMemory::Free(RowData);
+    Table->MarkPackageDirty();
+    if (!UEditorAssetLibrary::SaveLoadedAsset(Table, false))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Row added but failed to save DataTable: %s"), *TablePath));
+    }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);

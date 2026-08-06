@@ -366,4 +366,26 @@ def register_editor_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def duplicate_level(ctx: Context, source_path: str, destination_path: str) -> Dict[str, Any]:
+        """Duplicate a UE level as a new map asset with a unique internal asset ID.
+
+        Use this instead of copying .umap files directly: raw copies retain the source
+        Map PrimaryAssetID and make UE warn about duplicate map identities.
+        Example: duplicate_level('/Game/Maps/NewMap', '/Game/Maps/MainMap').
+        """
+        from unreal_mcp_server import get_unreal_connection
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            response = unreal.send_command("duplicate_level", {
+                "source_path": source_path,
+                "destination_path": destination_path,
+            })
+            return response or {"success": False, "message": "No response from Unreal Engine"}
+        except Exception as e:
+            logger.error(f"Error duplicating level: {e}")
+            return {"success": False, "message": str(e)}
+
     logger.info("Editor tools registered successfully")

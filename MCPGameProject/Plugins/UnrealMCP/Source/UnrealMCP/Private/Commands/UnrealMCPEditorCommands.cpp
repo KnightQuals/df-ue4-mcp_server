@@ -28,6 +28,12 @@
 // #include "Subsystems/EditorActorSubsystem.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "EditorAssetLibrary.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
+#include "Engine/World.h"
+#include "ObjectTools.h"
+#include "Misc/OutputDeviceNull.h"
 
 FUnrealMCPEditorCommands::FUnrealMCPEditorCommands()
 {
@@ -86,6 +92,10 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     else if (CommandType == TEXT("open_level"))
     {
         return HandleOpenLevel(Params);
+    }
+    else if (CommandType == TEXT("duplicate_level"))
+    {
+        return HandleDuplicateLevel(Params);
     }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
@@ -519,14 +529,19 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSaveLevel(const TSharedP
     }
 
     bool bSaved = false;
-    if (!SavePath.IsEmpty())
+    const FString CurrentPackageName = World->GetOutermost()->GetName();
+    if (!SavePath.IsEmpty() && CurrentPackageName != SavePath)
     {
-        // Save As — the path should be like "/Game/Maps/MyMap"
-        bSaved = UEditorLoadingAndSavingUtils::SaveMap(World, *SavePath);
+        // Save As via EditorFileUtils. UEditorLoadingAndSavingUtils::SaveMap is fine
+        // for saving the current package, but in UE4.27 it can block indefinitely
+        // when asked to fork a loaded .umap into another map package. SaveLevelAs
+        // creates a fresh world/package identity (no duplicate Map PrimaryAssetID).
+        FString SaveFilename = FPackageName::LongPackageNameToFilename(SavePath, FPackageName::GetMapPackageExtension());
+        bSaved = FEditorFileUtils::SaveLevelAs(World->PersistentLevel, &SaveFilename);
     }
     else
     {
-        // Save in place
+        // Save in place (no path given, or the target IS the current package).
         bSaved = UEditorLoadingAndSavingUtils::SaveCurrentLevel();
     }
 
@@ -586,6 +601,66 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleOpenLevel(const TSharedP
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("path"), LevelPath);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDuplicateLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    // Duplicate through EditorAssetLibrary rather than copying .umap bytes. A raw copy
+    // preserves the source world's internal PrimaryAssetId and triggers UE's duplicate
+    // Map-ID warning; this API creates a new package/world with a unique identity.
+    FString SourcePath, DestinationPath;
+    if (!Params->TryGetStringField(TEXT("source_path"), SourcePath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'source_path' parameter (e.g. /Game/Maps/NewMap)"));
+    }
+    if (!Params->TryGetStringField(TEXT("destination_path"), DestinationPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'destination_path' parameter (e.g. /Game/Maps/MainMap)"));
+    }
+    // Duplicate UWorld using UE4's own ObjectTools path (the same primitive used by
+    // FileHelpers Save As), then explicitly save the resulting package. AssetTools /
+    // EditorAssetLibrary duplication rejects UWorld map assets in UE4.27.
+    const FString SourceObjectPath = SourcePath + TEXT(".") + FPackageName::GetLongPackageAssetName(SourcePath);
+    const FString DestinationObjectPath = DestinationPath + TEXT(".") + FPackageName::GetLongPackageAssetName(DestinationPath);
+    UWorld* SourceWorld = LoadObject<UWorld>(nullptr, *SourceObjectPath);
+    if (!SourceWorld)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Source level not found: %s"), *SourcePath));
+    }
+    if (UEditorAssetLibrary::DoesAssetExist(DestinationObjectPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Destination already exists: %s"), *DestinationPath));
+    }
+
+    ObjectTools::FPackageGroupName NewPGN;
+    NewPGN.PackageName = DestinationPath;
+    NewPGN.ObjectName = FPackageName::GetLongPackageAssetName(DestinationPath);
+    TSet<UPackage*> PackagesUserRefusedToFullyLoad;
+    UWorld* DuplicatedWorld = Cast<UWorld>(ObjectTools::DuplicateSingleObject(SourceWorld, NewPGN, PackagesUserRefusedToFullyLoad, false));
+    if (!DuplicatedWorld)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to duplicate level %s -> %s"), *SourcePath, *DestinationPath));
+    }
+
+    UPackage* DuplicatedPackage = DuplicatedWorld->GetOutermost();
+    DuplicatedPackage->MarkAsFullyLoaded();
+    const FString DestinationFilename = FPackageName::LongPackageNameToFilename(DestinationPath, FPackageName::GetMapPackageExtension());
+    FOutputDeviceNull SaveOutput;
+    const bool bSaved = GEditor->Exec(nullptr, *FString::Printf(TEXT("OBJ SAVEPACKAGE PACKAGE=\"%s\" FILE=\"%s\" SILENT=true"), *DuplicatedPackage->GetName(), *DestinationFilename), SaveOutput);
+    if (bSaved)
+    {
+        FEditorFileUtils::SaveMapDataPackages(DuplicatedWorld, true, true);
+    }
+    if (!bSaved)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Duplicated level but failed to save: %s"), *DestinationPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("source_path"), SourcePath);
+    ResultObj->SetStringField(TEXT("destination_path"), DestinationPath);
     return ResultObj;
 }
 

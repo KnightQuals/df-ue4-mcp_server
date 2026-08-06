@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 #include "BreakthroughCharacter.generated.h"
 
 class UStaticMeshComponent;
@@ -70,6 +71,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float SprintSpeed = 800.f;
 
+	// ===== V2 outer forbidden-zone / elimination =====
+	// Replicated countdown shown only to the locally controlled player when outside the safe battlefield.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ForbiddenTimeRemaining, Category = "V2|ForbiddenZone")
+	float ForbiddenTimeRemaining = 10.f;
+
+	// True while this pawn is temporarily eliminated by the V2 outer forbidden zone.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Eliminated, Category = "V2|ForbiddenZone")
+	bool bIsEliminated = false;
+
+	// Called by AForbiddenZone overlap strips on the authoritative server.
+	void SetForbiddenZoneOverlap(bool bEntering, const FString& SourceZone);
+
+	// V2 config values supplied by GameMode / DataTable.
+	void ConfigureForbiddenZone(float InCountdownSeconds, float InRespawnDelaySeconds, float InSafeHalfExtentX, float InSafeHalfExtentY);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -96,10 +112,34 @@ protected:
 	FVector PatrolTarget = FVector::ZeroVector;
 	// Cooldown timer before picking the next patrol target (seconds).
 	float PatrolWaitTimer = 0.f;
-	// Cached idle/walk AnimSequence references so we don't LoadObject every tick.
+	// Cached idle/walk/jump AnimSequence references so we don't LoadObject every tick.
 	class UAnimSequence* IdleAnimAsset = nullptr;
 	class UAnimSequence* WalkAnimAsset = nullptr;
+	class UAnimSequence* JumpAnimAsset = nullptr;
 	bool bPatrolAnimIsWalk = false; // tracks which anim is currently playing
+	bool bAnimIsJump = false; // tracks whether the jump anim is currently playing
+
+	// V2 forbidden-zone implementation (server authoritative; state replicates to clients).
+	UFUNCTION()
+	void OnRep_ForbiddenTimeRemaining();
+
+	UFUNCTION()
+	void OnRep_Eliminated();
+
+	void UpdateForbiddenZone(float DeltaTime);
+	void EliminateInForbiddenZone();
+	void RespawnFromForbiddenZone();
+
+	int32 ForbiddenZoneOverlapCount = 0;
+	float ForbiddenCountdownDuration = 10.f;
+	float ForbiddenRespawnDelay = 3.f;
+	// V2 safe rectangle half extents (cm): everything outside this is forbidden,
+	// all the way to the map edge. Position-based check, not trigger-strip overlap.
+	float SafeHalfExtentX = 4500.f;
+	float SafeHalfExtentY = 3600.f;
+	bool bWasInForbiddenZone = false;
+	int32 LastForbiddenDisplaySecond = -1;
+	FTimerHandle ForbiddenRespawnTimer;
 
 	// Pick a new random patrol target inside the box around PatrolCenter.
 	void PickNewPatrolTarget();

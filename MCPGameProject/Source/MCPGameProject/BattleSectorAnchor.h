@@ -38,6 +38,19 @@ public:
 	UPROPERTY(EditAnywhere)
 	float CaptureSpeed = 1.f;
 
+	// V2 multi-sector progression: order of this anchor in the push sequence
+	// (0 = first objective, higher = later, closer to the defender base).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Sector")
+	int32 SectorIndex = 0;
+
+	// Only the currently active sector accepts capture. Inactive sectors show a
+	// dimmed/grey state and ignore overlap counting. Replicated so clients update visuals.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_IsActive, Category = "Battle|Sector")
+	bool bIsActive = true;
+
+	// Called by BattleSectorBase to activate/deactivate this sector.
+	void SetSectorActive(bool bNewActive);
+
 	// Box trigger used to detect actors entering/leaving the capture zone. Smaller
 	// than the 8m sphere (so the SpawnHubs 4m away don't overlap the trigger) and
 	// axis-aligned so the trigger area is predictable.
@@ -62,6 +75,10 @@ protected:
 	UFUNCTION()
 	void OnRep_OwningTeam();
 
+	// Called on clients when bIsActive replicates — update visuals for active/inactive.
+	UFUNCTION()
+	void OnRep_IsActive();
+
 	UFUNCTION()
 	void OnCaptureZoneBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
@@ -74,6 +91,15 @@ protected:
 
 	// Recolor AnchorMesh to represent the current owning team.
 	void ApplyAnchorColor();
+
+	// Tracks whether ApplyAnchorColor has run once (skip announcing the initial state).
+	bool bColorInitialized = false;
+
+	// Last team we announced a capture/retake for (avoid repeat announcements).
+	int32 LastAnnouncedTeam = -1;
+
+	// True once attackers have captured at least once (label shows RETAKEN vs CAPTURE ZONE).
+	bool bWasCapturedOnce = false;
 
 	// Resolve which team an overlapping actor belongs to.
 	// Returns: 0 = attacker, 1 = defender, -1 = unknown (not counted).

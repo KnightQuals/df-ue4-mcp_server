@@ -16,7 +16,7 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度（W6，2026-08-03 —— 最后一周收尾中）
+## 当前进度（W7，2026-08-06 —— V2 全部新增玩法落地，git 已同步）
 
 - [x] W4/W5 收尾（详见 WorkLog/2026-07-17.md、2026-08-03.md）
 - [x] **W6 MCP 接口大拓展**（7/27）：
@@ -35,7 +35,21 @@
 - [x] **W6 环境资源接入**（7/30-7/31）：KiteDemo（Open World Demo Collection）+ **XGE 卡死彻底修复**（禁 XGEController.uplugin）
 - [x] **★W6 关卡反复丢失根因★**（7/31）：`DefaultEngine.ini` 默认地图是引擎模板 OpenWorld，无 EditorStartupMap → 每次启动打开临时空地图。修复：`GameDefaultMap` + `EditorStartupMap` = `/Game/Maps/NewMap`
 - [x] **W6 环境装饰返工**（7/31-8/3）：巨石 scale 6-10 太大糊脸挡视野 → 删 11 个大装饰，改小尺度松树（scale 1.0-1.2）摆战场外围边缘（Y=±2800 两侧，避开中间走廊/据点），只做背景点缀
-- [ ] **收尾（最后一周）**：NewMap 环境定版 + 多人 2 窗口 PIE 真机验证 + V2 挑核心做（安全区/禁区 > DataTable > Spline）+ 录 Demo + 写 wiki 架构文档
+- [x] **W7 V2 核心玩法：DataTable + 外围禁区**（8/4）：
+  - `FBattleMapConfig` + `DT_BattleMapConfig`（MapId = NewMap）：对局时长、禁区倒计时、重生等待、安全区尺寸、边界宽度、占点速度全部配置化
+  - `AForbiddenZone`：GameMode 动态生成东/西/南/北四条红色禁区带；内侧攻方基地/交战区/据点区/守方基地均为安全区
+  - 禁区规则：进区 10 秒实时倒计时 → 淘汰（隐藏/禁移动）→ 3 秒后按 Team 回所属 SpawnHub 重生；server authoritative + Replicated
+  - DataTable MCP 接口修复：由 transient table 改为 AssetTools 创建并保存资产，重启 UE 后 read_row 验证持久化
+- [x] **V1 存档点**（8/4）：通过新 `duplicate_level` MCP 接口从 NewMap 创建**独立 Map Asset ID**的 `MainMap` + `BackUpMap`（不用 raw copy `.umap`，避免重复资产 ID）；保留完整环境/石碑据点/双人玩法成果
+- [x] **W7 V2 多据点推进**（8/5）：Anchor 加 `SectorIndex`+`bIsActive`（Replicated）；SectorBase 自动发现/排序据点、顺序解锁；占领→公告→激活下一据点→全占攻方胜；NewMap 新增 Anchor_2（初始灰色 LOCKED）
+- [x] **W7 V2 Conquest 占领模式**（8/5）：`ABattleGameState`（双队比分 Replicated + 顶部比分显示）+ `AGameMode_Conquest`（全据点同时激活，按持有数每秒加分，先到 ScoreToWin 胜）+ `BP_GameMode_Conquest`；计分参数并入 DataTable
+- [x] **W7 V2 Spline 区域边界**（8/5）：`ABattleAreaSpline` 闭合样条多边形 + `IsPointInside` 射线法 + 绿色 SplineMesh 边界线；禁区判定优先用 Spline，回退矩形坐标判定；修复运行时 FObjectFinder 闪退（改 LoadObject）
+- [x] **W7 占点规则定版**（8/5-8/6，经多轮验收迭代）：
+  - 人数差推进：攻方人多→涨 / 守方人多→回退 / **对峙（人数相等）→ 冻结** / **空区 → 回退（弃点丢进度）**
+  - 修复：占领后红闪灰（红色保持=已占领语义）、对峙时进度仍走、触碰禁区边界倒计时重置（旧触发带 overlap 残留重置逻辑已移除）
+  - 据点颜色语义：**红=已被攻方占领 / 灰=未解锁 / 蓝=待占领**
+- [x] **三图管理铁律**（8/4-8/6）：MainMap=最稳存档（仅用户发话才覆盖）/ NewMap=工作台 / BackUpMap=每次加新功能前 duplicate_level 存 NewMap 旧版本（8/6 已快照占点定版版）
+- [ ] **收尾（请假 8/7、8/10，8/11 起）**：Spline 三区分明（基地/据点/交战区，复用 ABattleAreaSpline）+（可选）小地图 + **录 Demo + 写 wiki 架构文档（硬交付）**
 
 > **协作模式（7/30 与 cap 沟通后确定）**：AI 只写后端 C++ 代码 + 改 MCP 接口；UE 引擎前端操作（调蓝图 / 拖角色 / 导入资源 / Play）由用户手动做，AI 提供手把手教程。主 MainMap 保住已验证成果，环境实验在 NewMap 里做。
 
@@ -57,14 +71,19 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 | 类 | 状态 | 作用 |
 |---|---|---|
-| `ABattleSectorAnchor` | ✅ 已建 + 验收 | 据点：CaptureZone（BoxComponent，运行时重建防序列化残留）+ Overlap 计数 + Tick 双向占领（-1 守 / 0 中立 / 1 攻，按真实 Team 属性判定）+ 变色（ApplyAnchorColor）+ OwningTeam/CaptureProgress **Replicated（OnRep 同步变色）** |
+| `ABattleSectorAnchor` | ✅ 已建 + 验收 + 多据点 | 据点：Overlap 计数 + **人数差推进**（攻多→涨/守多→退/对峙→冻结/空区→回退）+ `SectorIndex`/`bIsActive`（推进顺序+锁定）+ 变色（红=已占/灰=未解锁/蓝=待占）+ OwningTeam/CaptureProgress **Replicated** |
 | `ABattleCampSector` | ✅ 已建 | 攻方基地（Cube 外形） |
 | `ABattleDefenderCamp` | ✅ 已建 | 守方基地（Cube 外形） |
-| `ABattleSectorBase` | ✅ 胜负判定补全 | 区域容器（持有基地/据点引用 + MatchDuration 倒计时 + bMatchOver + 时间到判攻守胜） |
+| `ABattleSectorBase` | ✅ 胜负判定+多据点推进 | 区域容器 + MatchDuration 倒计时 + 胜负判定 + **V2 顺序解锁据点**（自动发现排序、占领→公告→激活下一、全占攻方胜） |
 | `ASpawnAreaHub` | ✅ 已建（7/16）+ 视觉化 | 出生点集（TArray SpawnPoints + GetRandomSpawnPoint）+ Team 属性 + BoxComponent 线框 + TextRender 文字 |
-| `ABreakthroughCharacter` | ✅ 已建 + 多人 + 巡逻 + 加速 | 玩家/AI Character：Team 阵营（**Replicated**）+ FirstPersonCamera + Mannequin（OwnerNoSee）+ **守方 AI C++ 巡逻**（SetActorLocation sweep 移动 + Idle/Jog 动画切换）+ **Shift 加速**（400/800）+ **bReplicates 多人同步** |
+| `ABreakthroughCharacter` | ✅ 已建 + 多人 + V2淘汰重生 | 玩家/AI Character：Team（**Replicated**）+ FirstPersonCamera + Mannequin（OwnerNoSee）+ AI C++ 巡逻（SetActorLocation sweep + Idle/Jog）+ Shift/空格跳跃 + **禁区倒计时/淘汰/按阵营重生（Replicated，位置判定+Spline 优先）** |
+| `AForbiddenZone` | ✅ V2（8/4） | 外围禁区条：红色薄边界/警示文字，仅视觉警示；倒计时由 Character 位置判定驱动 |
+| `ABattleAreaSpline` | ✅ V2（8/5） | 闭合样条安全区：USplineComponent 多边形 + IsPointInside 射线法 + 绿色边界线；编辑器可拖点改形状 |
+| `ABattleGameState` | ✅ V2（8/5） | Conquest 共享状态：AttackerScore/DefenderScore/ScoreToWin Replicated + 顶部比分显示 |
+| `FBattleMapConfig` | ✅ V2（8/4-8/5） | DataTable Row（MapId）：对局时长、禁区倒计时/重生/边界、安全范围、占点速度、Conquest 计分三项 |
 | `ADefaultPlayerController` | ✅ 已建（7/16） | 玩家控制器（V1 空实现用引擎默认输入） |
-| `AGameMode_Breakthrough` | ✅ 已建 + 多人 | GameMode（双 SpawnHub 按 Team 分队 spawn）+ **多人：延迟 1.5s 判断玩家数，单人 spawn AI 守方 / 双人真人分攻守** |
+| `AGameMode_Breakthrough` | ✅ 已建 + 多人 + V2配置 | 双 SpawnHub 按 Team 分队；单人 AI/双人真人分攻守；BeginPlay 加载 DataTable + 生成禁区带 + 生成 Spline 安全边界 |
+| `AGameMode_Conquest` | ✅ V2（8/5） | 占领模式（继承 Breakthrough）：全据点同时激活 + 持有据点数持续得分 + 先到 ScoreToWin 胜 |
 
 ## 未来计划（Roadmap）
 
@@ -80,11 +99,13 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - [ ] **环境定版**：NewMap 外围小树点缀视觉确认（不挡视野）
 
 ### V2 详细设计（课题 全面战场 V2）
-- [ ] **DataTable 配置**（Key=MapID）：对局时间 / 禁区倒计时 / 据点位置 / 阵营归属（**MCP 接口已备好，逻辑待写**）
-- [ ] **Spline 区域范围**：用 `USplineComponent` 制作基地 / 据点 / 交战区边界
-- [ ] **安全区 / 禁区机制**：敌方区/外围 = 禁区，进入 10s 倒计时死亡（**玩法完整度最高，最后一周优先**）
-- [ ] **GameMode 两种**：Breakthrough（攻防）+ Conquest（占领）
-- [ ] **多人同步进阶**：Server/Client RPC + PlayerState 计分（V1 已打通 Replicated 基础）
+- [x] **DataTable 配置**（8/4）：`DT_BattleMapConfig`，Key = `NewMap`；对局时间 / 禁区倒计时 / 重生等待 / 安全范围 / 禁区带宽度 / 据点速度 / Conquest 计分配置化。MCP create/add/read 接口已修为持久资产。
+- [x] **安全区 / 禁区机制**（8/4）：安全区外全部区域为禁区，位置判定（Spline 优先）10 秒倒计时淘汰，3 秒按阵营重生。server authoritative + Replicated。
+- [x] **Spline 区域边界**（8/5）：`ABattleAreaSpline` 闭合样条 + 边界线可视化 + 多边形内检测；外围安全区已用 Spline（待做：基地/据点/交战区三区 Spline 分明）
+- [x] **GameMode 两种**（8/5）：Breakthrough（攻防，含多据点顺序推进）+ Conquest（占领，持有据点持续得分）
+- [ ] **Spline 三区**：基地/据点/交战区独立 Spline 区域 + 颜色区分（复用 ABattleAreaSpline）
+- [ ] **小地图**（待定）：左上角俯拍小地图，需 UMG/SceneCapture 接口，性价比低
+- [ ] **多人同步进阶**：Server/Client RPC + PlayerState 计分（V1/V2 已打通 Replicated 基础）
 
 ### MCP 接口拓展（L2 自动化系统扩展）
 **策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。持续验证成功。
@@ -92,7 +113,7 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - [x] **FClassProperty 分支**（7/17 完成）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等）
 - [x] **日志接口**（7/17 完成）：`get_output_log` 读 UE 输出日志（FILEREAD_AllowWrite 修复独占写）
 - [x] **反射属性**（7/27 完成）：`get_actor_properties` 用 TFieldIterator 返回完整 UPROPERTY
-- [x] **关卡接口**（7/27 完成）：`save_level` / `new_level` / `open_level`
+- [x] **关卡接口**（7/27-8/4）：`save_level` / `new_level` / `open_level` / **`duplicate_level`**。duplicate_level 用 UE4 ObjectTools 创建独立 UWorld/Package，规避 raw copy `.umap` 的 Duplicate PrimaryAssetID
 - [x] **DataTable 接口**（7/27 完成）：`create_data_table` / `add_row` / `read_row`
 - [x] **mesh 摆放**（7/30 完成）：`spawn_actor` 加 `mesh_path` 参数（程序化 spawn StaticMesh）+ 重名崩溃修复（MakeUniqueObjectName）
 - [ ] **资产接口**：`create_asset` / `import_texture` / `set_default_material`（Content Browser 操作）
@@ -134,7 +155,13 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 ### 多人（2 Player）验证
 1. 顶部工具栏 ▶ 旁下拉 → **Number of Players = 2** + **Net Mode = Play As Listen Server**。
 2. ▶ Play → 弹出两个窗口：玩家 1 = 攻方（左），玩家 2 = 守方（右），此时不 spawn AI。
-3. 两窗口能看到对方角色移动（Replication）；攻方占领据点时两个窗口据点同步变红（OnRep）。
+3. 两窗口能看到对方角色移动、朝向、跳跃（Replication）；攻方占领据点时两个窗口同步变红与显示占领公告（OnRep）。
+
+### V2 外围禁区验证（单人/双人均可）
+1. Play 后，红色细边界和 `FORBIDDEN ZONE - RETURN TO BATTLEFIELD` 文字围住基地/交战区/据点组成的安全区。
+2. 穿过红线到场地外：屏幕显示 `WARNING: FORBIDDEN ZONE - RETURN IN 10`，每秒递减。
+3. 10 秒内返回边界内：倒计时取消并恢复为 10 秒；若停在外面：角色淘汰、隐藏且不能移动，约 3 秒后从所属阵营基地重生。
+4. 关卡参数可在 `Content/Config/DT_BattleMapConfig` 的 `NewMap` 行统一调整，不必改 C++。
 
 ## 已知环境注意事项（backport 踩坑记录）
 
@@ -144,6 +171,7 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - **命名铁律**：项目名/路径/类名全程纯英文+数字（中文路径会导致 UnrealHeaderTool 乱码）。
 - **默认地图必须设**：`DefaultEngine.ini` 的 `GameDefaultMap` + `EditorStartupMap` 都要指向项目关卡，否则 UE 每次启动打开引擎模板/临时地图，spawn 的 actor 一关就丢。
 - **C++ 改蓝图继承的组件类型**（如 Sphere→Box）会留序列化残留，recompile 清不掉 → 运行时 `NewObject` 重建组件规避。
+- **地图备份/存档**：禁止直接复制 `.umap` 到 `Content/Maps`，否则内部 `PrimaryAssetID` 重复并报警。外部文件备份放 `MAP/`；要在 Content 内创建可打开的独立存档，调用 `duplicate_level('/Game/Maps/NewMap', '/Game/Maps/MainMap')`。
 
 ---
 

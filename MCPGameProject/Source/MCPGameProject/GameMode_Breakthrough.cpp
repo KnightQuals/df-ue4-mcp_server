@@ -5,6 +5,10 @@
 #include "BreakthroughCharacter.h"
 #include "BattleSectorAnchor.h"
 #include "DefaultPlayerController.h"
+#include "ForbiddenZone.h"
+#include "BattleAreaSpline.h"
+#include "BattleSectorBase.h"
+#include "Engine/DataTable.h"
 #include "EngineUtils.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
@@ -35,9 +39,115 @@ void AGameMode_Breakthrough::BeginPlay()
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("GameMode_Breakthrough started, AttackerHub=%s DefenderHub=%s"),
+	// V2: apply DataTable-driven match / forbidden-zone settings, then build the
+	// four physical outer-border triggers. This happens only on the authority GameMode.
+	LoadAndApplyMapConfig();
+	SpawnForbiddenZoneBorders();
+	SpawnSafeBattlefieldSpline();
+
+	UE_LOG(LogTemp, Warning, TEXT("GameMode_Breakthrough started, AttackerHub=%s DefenderHub=%s MapId=%s"),
 		AttackerHub ? *AttackerHub->GetName() : TEXT("None"),
-		DefenderHub ? *DefenderHub->GetName() : TEXT("None"));
+		DefenderHub ? *DefenderHub->GetName() : TEXT("None"), *MapId.ToString());
+}
+
+void AGameMode_Breakthrough::LoadAndApplyMapConfig()
+{
+	// The project ships a DataTable row for NewMap. Keep a safe C++ fallback so a
+	// missing user-created asset never prevents the MiniGame from starting.
+	if (!MapConfigTable)
+	{
+		MapConfigTable = LoadObject<UDataTable>(nullptr, TEXT("/Game/Config/DT_BattleMapConfig.DT_BattleMapConfig"));
+	}
+
+	if (MapConfigTable)
+	{
+		if (const FBattleMapConfig* Row = MapConfigTable->FindRow<FBattleMapConfig>(MapId, TEXT("GameMode_Breakthrough")))
+		{
+			ActiveMapConfig = *Row;
+			UE_LOG(LogTemp, Warning, TEXT("V2 MapConfig loaded: MapId=%s Match=%.0fs Forbidden=%.0fs Safe=(%.0f, %.0f)"),
+				*MapId.ToString(), ActiveMapConfig.MatchDuration, ActiveMapConfig.ForbiddenCountdown,
+				ActiveMapConfig.SafeHalfExtentX, ActiveMapConfig.SafeHalfExtentY);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("V2 MapConfig row '%s' missing; using C++ defaults"), *MapId.ToString());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("V2 MapConfig DataTable missing; using C++ defaults"));
+	}
+
+	// Apply map-tuned values to existing gameplay actors.
+	for (TActorIterator<ABattleSectorBase> It(GetWorld()); It; ++It)
+	{
+		It->MatchDuration = ActiveMapConfig.MatchDuration;
+	}
+	for (TActorIterator<ABattleSectorAnchor> It(GetWorld()); It; ++It)
+	{
+		It->CaptureSpeed = ActiveMapConfig.CaptureSpeed;
+	}
+}
+
+void AGameMode_Breakthrough::SpawnForbiddenZoneBorders()
+{
+	if (!HasAuthority() || ForbiddenZones.Num() > 0)
+	{
+		return;
+	}
+
+	const float HalfX = ActiveMapConfig.SafeHalfExtentX;
+	const float HalfY = ActiveMapConfig.SafeHalfExtentY;
+	const float Border = ActiveMapConfig.ForbiddenBorderWidth;
+	const float HalfBorder = Border * 0.5f;
+
+	struct FBorderDefinition
+	{
+		FVector Location;
+		FVector Extent;
+		FString Label;
+	};
+
+	// Four strips deliberately overlap at their corners. Character keeps an overlap
+	// count, so leaving one corner strip does not prematurely clear the countdown.
+	const TArray<FBorderDefinition> Borders =
+	{
+		{ FVector(0.f, HalfY + HalfBorder, 80.f), FVector(HalfX + Border, HalfBorder, 350.f), TEXT("FORBIDDEN ZONE - RETURN TO BATTLEFIELD") },
+		{ FVector(0.f, -HalfY - HalfBorder, 80.f), FVector(HalfX + Border, HalfBorder, 350.f), TEXT("FORBIDDEN ZONE - RETURN TO BATTLEFIELD") },
+		{ FVector(HalfX + HalfBorder, 0.f, 80.f), FVector(HalfBorder, HalfY, 350.f), TEXT("FORBIDDEN ZONE - RETURN TO BATTLEFIELD") },
+		{ FVector(-HalfX - HalfBorder, 0.f, 80.f), FVector(HalfBorder, HalfY, 350.f), TEXT("FORBIDDEN ZONE - RETURN TO BATTLEFIELD") },
+	};
+
+	for (const FBorderDefinition& BorderDef : Borders)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AForbiddenZone* Zone = GetWorld()->SpawnActor<AForbiddenZone>(AForbiddenZone::StaticClass(), BorderDef.Location, FRotator::ZeroRotator, Params);
+		if (Zone)
+		{
+			Zone->ConfigureZone(BorderDef.Label, BorderDef.Extent);
+			ForbiddenZones.Add(Zone);
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("V2 ForbiddenZone: spawned %d outer border strips"), ForbiddenZones.Num());
+}
+
+void AGameMode_Breakthrough::SpawnSafeBattlefieldSpline()
+{
+	if (!HasAuthority() || SafeBattlefieldSpline)
+	{
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SafeBattlefieldSpline = GetWorld()->SpawnActor<ABattleAreaSpline>(ABattleAreaSpline::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (SafeBattlefieldSpline)
+	{
+		SafeBattlefieldSpline->ConfigureRectangle(ActiveMapConfig.SafeHalfExtentX, ActiveMapConfig.SafeHalfExtentY);
+		UE_LOG(LogTemp, Warning, TEXT("V2 Spline: spawned editable safe boundary (%.0f x %.0f)"),
+			ActiveMapConfig.SafeHalfExtentX * 2.f, ActiveMapConfig.SafeHalfExtentY * 2.f);
+	}
 }
 
 APawn* AGameMode_Breakthrough::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
@@ -107,7 +217,9 @@ APawn* AGameMode_Breakthrough::SpawnDefaultPawnFor_Implementation(AController* N
 	if (NewPawn)
 	{
 		NewPawn->Team = Team;
-		UE_LOG(LogTemp, Warning, TEXT("SpawnDefaultPawnFor: spawned team=%d (attacker) at %s"), Team, *SpawnLocation.ToString());
+		NewPawn->ConfigureForbiddenZone(ActiveMapConfig.ForbiddenCountdown, ActiveMapConfig.RespawnDelay, ActiveMapConfig.SafeHalfExtentX, ActiveMapConfig.SafeHalfExtentY);
+		UE_LOG(LogTemp, Warning, TEXT("SpawnDefaultPawnFor: spawned team=%d at %s (V2 forbidden=%.0fs)"),
+			Team, *SpawnLocation.ToString(), ActiveMapConfig.ForbiddenCountdown);
 	}
 
 	return NewPawn;
@@ -177,6 +289,7 @@ void AGameMode_Breakthrough::TrySpawnDefenderAI()
 	if (DefenderAI)
 	{
 		DefenderAI->Team = 1;
+		DefenderAI->ConfigureForbiddenZone(ActiveMapConfig.ForbiddenCountdown, ActiveMapConfig.RespawnDelay, ActiveMapConfig.SafeHalfExtentX, ActiveMapConfig.SafeHalfExtentY);
 		DefenderAI->PatrolCenter = SpawnLocation;
 		DefenderAI->PatrolRadius = 1200.f; // 24m box, inside the 30m SpawnHub area
 		bDefenderAISpawned = true;

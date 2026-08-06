@@ -11,12 +11,40 @@ void ABattleSectorAnchor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ABattleSectorAnchor, OwningTeam);
 	DOREPLIFETIME(ABattleSectorAnchor, CaptureProgress);
+	DOREPLIFETIME(ABattleSectorAnchor, bIsActive);
 }
 
 void ABattleSectorAnchor::OnRep_OwningTeam()
 {
 	// Clients recolor the anchor when the server replicates a new owning team.
 	ApplyAnchorColor();
+}
+
+void ABattleSectorAnchor::OnRep_IsActive()
+{
+	ApplyAnchorColor();
+}
+
+void ABattleSectorAnchor::SetSectorActive(bool bNewActive)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bIsActive = bNewActive;
+	// Inactive sectors ignore capture entirely.
+	if (CaptureZone)
+	{
+		CaptureZone->SetGenerateOverlapEvents(bNewActive);
+	}
+	if (!bNewActive)
+	{
+		AttackersInZone = 0;
+		DefendersInZone = 0;
+	}
+	OnRep_IsActive();
+	ForceNetUpdate();
+	UE_LOG(LogTemp, Warning, TEXT("Sector %d (index) %s"), SectorIndex, bNewActive ? TEXT("ACTIVATED") : TEXT("deactivated"));
 }
 
 // Sets default values
@@ -124,6 +152,24 @@ void ABattleSectorAnchor::BeginPlay()
 
 	if (AnchorMeshComp && AnchorMeshComp->GetMaterial(0))
 	{
+		// Swap the cylinder for a KiteDemo "reveal rock" (stone-monument look) and force
+		// the team-color material so ApplyAnchorColor's MID always has a Color parameter
+		// to drive. The KiteDemo rock's own material has no Color/BaseColor scalar param,
+		// so keeping it would make the recolor a silent no-op.
+		UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr,
+			TEXT("/Game/KiteDemo/Environments/Rocks/GroundRevealRock001/SM_GroundRevealRock001"));
+		if (RockMesh)
+		{
+			AnchorMeshComp->SetStaticMesh(RockMesh);
+			UE_LOG(LogTemp, Warning, TEXT("AnchorMesh swapped to SM_GroundRevealRock001"));
+		}
+		UMaterialInterface* ColorMat = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Game/Materials/M_AnchorColor.M_AnchorColor"));
+		if (ColorMat)
+		{
+			AnchorMeshComp->SetMaterial(0, ColorMat);
+		}
+
 		AnchorMID = UMaterialInstanceDynamic::Create(AnchorMeshComp->GetMaterial(0), this);
 		if (AnchorMID)
 		{
@@ -198,7 +244,19 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 		return;
 	}
 
-	// Bidirectional capture: progress drifts toward whichever side outnumbers the other.
+	// V2 multi-sector: only the currently active sector can be captured.
+	if (!bIsActive)
+	{
+		return;
+	}
+
+	// V2 capture rule — NUMBER-ADVANTAGE based:
+	//   attackers outnumber defenders -> progress up
+	//   defenders outnumber attackers -> progress down
+	//   equal numbers (including both present "contested", or empty) -> PAUSED
+	// A defender walking in to even the count freezes the countdown until they leave.
+	// Progress is continuous (CaptureSpeed/s), so captures take visible time and never
+	// "snap" instantly when a defender steps out.
 	const int32 Advantage = AttackersInZone - DefendersInZone;
 	if (Advantage > 0)
 	{
@@ -238,7 +296,22 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			UE_LOG(LogTemp, Warning, TEXT("Capture progress %.2f (defenders pushing)"), CaptureProgress);
 		}
 	}
-	// Advantage == 0: contested / empty -> progress frozen.
+	// Contested-equal: progress paused. Empty zone: progress REGRESSES back toward
+	// the defender side (-1) — abandoning the point mid-capture loses progress.
+	else if (Advantage == 0 && AttackersInZone == 0 && DefendersInZone == 0)
+	{
+		CaptureProgress -= CaptureSpeed * DeltaTime;
+		if (CaptureProgress <= -1.f)
+		{
+			CaptureProgress = -1.f;
+			if (OwningTeam != 1)
+			{
+				OwningTeam = 1; // reverted to defenders (abandoned)
+				UE_LOG(LogTemp, Warning, TEXT("Sector reverted to defenders (abandoned)!"));
+				ApplyAnchorColor();
+			}
+		}
+	}
 }
 
 void ABattleSectorAnchor::ApplyAnchorColor()
@@ -249,6 +322,7 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 	}
 
 	// Color reflects current ownership: 0 attacker = red, 1 defender = blue, neutral = white.
+	// V2: an inactive sector (not yet the active objective) shows dimmed grey.
 	FLinearColor TeamColor = FLinearColor::White; // neutral
 	if (OwningTeam == 0) // attackers
 	{
@@ -257,6 +331,13 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 	else if (OwningTeam == 1) // defenders
 	{
 		TeamColor = FLinearColor(0.f, 0.2f, 1.f); // blue
+	}
+	// Grey/locked ONLY for future sectors that were never captured. A sector the
+	// attackers already captured (OwningTeam=0, then deactivated by progression)
+	// stays red — it means "done", not "locked".
+	if (!bIsActive && OwningTeam != 0)
+	{
+		TeamColor = FLinearColor(0.25f, 0.25f, 0.25f); // dim grey = locked future sector
 	}
 
 	// Generic fallback: try common vector parameter names. SetVectorParameterValue on a
@@ -288,7 +369,57 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 			LabelColor = FColor(80, 160, 255); // blue = defender owns
 		}
 		AreaLabel->SetTextRenderColor(LabelColor);
+
+		// Status text on the floating label (A -> B state readout).
+		FString StatusText = FString::Printf(TEXT("SECTOR %d"), SectorIndex + 1);
+		if (OwningTeam == 0)
+		{
+			StatusText = FString::Printf(TEXT("SECTOR %d CAPTURED (ATTACK)"), SectorIndex + 1);
+		}
+		else if (OwningTeam == 1)
+		{
+			StatusText = bWasCapturedOnce
+				? FString::Printf(TEXT("SECTOR %d RETAKEN (DEFENSE)"), SectorIndex + 1)
+				: FString::Printf(TEXT("SECTOR %d"), SectorIndex + 1);
+		}
+		if (!bIsActive && OwningTeam != 0)
+		{
+			StatusText = FString::Printf(TEXT("SECTOR %d (LOCKED)"), SectorIndex + 1);
+		}
+		else if (!bIsActive && OwningTeam == 0)
+		{
+			StatusText = FString::Printf(TEXT("SECTOR %d CAPTURED (ATTACK)"), SectorIndex + 1);
+		}
+		AreaLabel->SetText(FText::FromString(StatusText));
 	}
+
+	// Real-time capture-state announcement: on-screen big message + log, on BOTH server
+	// (called from Tick capture) and clients (called from OnRep_OwningTeam). Skip the very
+	// first application at BeginPlay so we don't announce the initial state.
+	if (bColorInitialized && OwningTeam != LastAnnouncedTeam)
+	{
+		FString Announce;
+		FColor AnnounceColor = FColor::White;
+		if (OwningTeam == 0)
+		{
+			Announce = FString::Printf(TEXT(">>> SECTOR CAPTURED BY ATTACKERS! <<<"));
+			AnnounceColor = FColor(255, 60, 60);
+			bWasCapturedOnce = true;
+		}
+		else if (OwningTeam == 1)
+		{
+			Announce = FString::Printf(TEXT(">>> SECTOR RETAKEN BY DEFENDERS! <<<"));
+			AnnounceColor = FColor(60, 140, 255);
+		}
+		if (GEngine && !Announce.IsEmpty())
+		{
+			// Key -1 = always a new message; 5s duration; large font so it reads mid-screen.
+			GEngine->AddOnScreenDebugMessage((uint64)-1, 5.f, AnnounceColor, Announce, true, FVector2D(2.0f, 2.0f));
+		}
+		UE_LOG(LogTemp, Warning, TEXT("%s"), *Announce);
+		LastAnnouncedTeam = OwningTeam;
+	}
+	bColorInitialized = true;
 }
 
 int32 ABattleSectorAnchor::GetActorTeam_Implementation(AActor* OtherActor) const

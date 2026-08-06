@@ -4,10 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "BattleMapConfig.h"
 #include "GameMode_Breakthrough.generated.h"
 
 class ASpawnAreaHub;
 class ABreakthroughCharacter;
+class AForbiddenZone;
+class ABattleAreaSpline;
+class UDataTable;
 
 // V1 game mode for the Breakthrough sector battle: finds the level's spawn hub and
 // spawns players as either attackers or defenders, alternating team assignment.
@@ -36,9 +40,39 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle")
 	TSubclassOf<ABreakthroughCharacter> DefenderClass;
 
+	// ===== V2 map configuration (DataTable row key = MapId) =====
+	// If not assigned in the Blueprint, BeginPlay loads /Game/Config/DT_BattleMapConfig.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|MapConfig")
+	UDataTable* MapConfigTable = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|MapConfig")
+	FName MapId = TEXT("NewMap");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "V2|MapConfig")
+	FBattleMapConfig ActiveMapConfig;
+
+	// Dynamically spawned red outer-border strips. The inner play space (bases, combat
+	// area, and capture anchor) is safe; crossing a strip begins the V2 elimination timer.
+	UPROPERTY(Transient)
+	TArray<AForbiddenZone*> ForbiddenZones;
+
+	// V2 closed spline representing the same safe battlefield area. Characters query
+	// this polygon rather than relying on finite-width overlap strips.
+	UPROPERTY(Transient)
+	ABattleAreaSpline* SafeBattlefieldSpline = nullptr;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	// Loads the MapId DataTable row and applies it to existing battle actors.
+	void LoadAndApplyMapConfig();
+
+	// Creates four V2 forbidden-zone border strips around the safe battlefield rectangle.
+	void SpawnForbiddenZoneBorders();
+
+	// Creates a closed, editable spline outline for the safe battlefield polygon.
+	void SpawnSafeBattlefieldSpline();
 
 	// Called after a player joins the game.
 	virtual void PostLogin(APlayerController* NewPlayer) override;
