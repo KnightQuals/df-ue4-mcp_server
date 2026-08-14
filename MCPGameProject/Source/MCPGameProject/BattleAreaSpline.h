@@ -28,15 +28,35 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "V2|Spline")
 	UTextRenderComponent* AreaLabel;
 
+	// Only the outer safe-boundary spline should be true. Gameplay-region splines
+	// (bases/combat/objectives) are display boundaries and don't affect the forbidden-zone test.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Spline")
 	bool bSafeArea = true;
+
+	// Display label and color make the V2 battlefield's bases, combat zone, and
+	// objectives visually distinct without adding collision or gameplay side effects.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Spline")
+	FString AreaName = TEXT("SAFE BATTLEFIELD");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Spline")
+	FLinearColor BoundaryColor = FLinearColor(0.08f, 0.9f, 0.2f);
+
+	// Floating 3D labels were rejected in playtest (overlapping/mirrored text clutter).
+	// Default off: regions read via ground court-lines + HUD hint instead.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Spline")
+	bool bShowLabel = false;
 
 	// Returns true when a world-space point lies within this closed spline polygon.
 	UFUNCTION(BlueprintCallable, Category = "V2|Spline")
 	bool IsPointInside(const FVector& WorldPoint) const;
 
-	// Builds a closed safe rectangle using the V2 DataTable extents and draws its border.
+	// Builds a closed rectangle and draws its boundary. The owning actor's location is
+	// the rectangle centre, so GameMode can use it for bases, combat space, or sectors.
 	void ConfigureRectangle(float HalfExtentX, float HalfExtentY);
+
+	// Configures the named/color-coded V2 gameplay regions (base, combat, objective).
+	void ConfigureGameplayArea(const FString& InAreaName, const FLinearColor& InBoundaryColor,
+		float HalfExtentX, float HalfExtentY);
 
 protected:
 	virtual void BeginPlay() override;

@@ -51,6 +51,17 @@ public:
 	// Called by BattleSectorBase to activate/deactivate this sector.
 	void SetSectorActive(bool bNewActive);
 
+	// Conquest round reset (user request 2026-08-14): restore the fresh-match state —
+	// defender ownership at full -1 progress, zeroed zone counts, initial color/label.
+	// Silent: no "RETAKEN" announcement. Authority-only.
+	void ResetToInitialState();
+
+	// Rides the same replication bunch as OwningTeam during ResetToInitialState so
+	// neither server nor clients fire a misleading "SECTOR RETAKEN" announcement.
+	// Cleared by the next Tick-driven ownership change (a real capture/reclaim).
+	UPROPERTY(Replicated)
+	bool bResetSilently = false;
+
 	// Box trigger used to detect actors entering/leaving the capture zone. Smaller
 	// than the 8m sphere (so the SpawnHubs 4m away don't overlap the trigger) and
 	// axis-aligned so the trigger area is predictable.
