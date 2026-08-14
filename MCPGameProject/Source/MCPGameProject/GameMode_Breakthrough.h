@@ -61,6 +61,11 @@ public:
 	UPROPERTY(Transient)
 	ABattleAreaSpline* SafeBattlefieldSpline = nullptr;
 
+	// Display-only V2 regions: attacker/defender bases, active combat area, and
+	// capture-sector outlines. Kept separate from the outer safe-boundary spline.
+	UPROPERTY(Transient)
+	TArray<ABattleAreaSpline*> GameplayAreaSplines;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -74,13 +79,20 @@ protected:
 	// Creates a closed, editable spline outline for the safe battlefield polygon.
 	void SpawnSafeBattlefieldSpline();
 
+	// Creates display-only color-coded splines for two bases, combat area, and sectors.
+	void SpawnGameplayAreaSplines();
+
 	// Called after a player joins the game.
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 
-	// Deferred AI-defender spawn: called ~1.5s after the first login so we can tell
-	// whether a 2nd human player is joining (multiplayer) before deciding to spawn AI.
+	// Deferred AI-defender spawn: called after the first login so we can tell whether
+	// a 2nd human player is joining before deciding to spawn the solo-demo AI.
 	UFUNCTION()
 	void TrySpawnDefenderAI();
+
+	// A late second human player may join after the solo AI has spawned. Remove every
+	// unpossessed Team-1 placeholder so packaged local multiplayer has exactly 2 pawns.
+	void RemoveSoloDefenderAI();
 
 	// Spawn the pawn for a new player, alternating attacker/defender team assignment.
 	virtual APawn* SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot) override;

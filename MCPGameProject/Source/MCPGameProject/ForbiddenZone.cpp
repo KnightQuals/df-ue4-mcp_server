@@ -41,7 +41,14 @@ AForbiddenZone::AForbiddenZone()
 	{
 		BorderVisual->SetStaticMesh(CubeMesh.Object);
 	}
-	if (UMaterialInterface* BorderMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_AnchorColor.M_AnchorColor")))
+	// Asset lives under /Game/Blueprints; the old /Game/Materials path silently failed
+	// and left the perimeter strips grey instead of red.
+	UMaterialInterface* BorderMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Blueprints/M_AnchorColor.M_AnchorColor"));
+	if (!BorderMaterial)
+	{
+		BorderMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_AnchorColor.M_AnchorColor"));
+	}
+	if (BorderMaterial)
 	{
 		// Only assign the base material in the constructor. Creating a dynamic material
 		// here uses NewObject during default-subobject construction and fatals in UE4.27;

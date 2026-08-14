@@ -12,6 +12,7 @@ void ABattleSectorAnchor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(ABattleSectorAnchor, OwningTeam);
 	DOREPLIFETIME(ABattleSectorAnchor, CaptureProgress);
 	DOREPLIFETIME(ABattleSectorAnchor, bIsActive);
+	DOREPLIFETIME(ABattleSectorAnchor, bResetSilently);
 }
 
 void ABattleSectorAnchor::OnRep_OwningTeam()
@@ -45,6 +46,27 @@ void ABattleSectorAnchor::SetSectorActive(bool bNewActive)
 	OnRep_IsActive();
 	ForceNetUpdate();
 	UE_LOG(LogTemp, Warning, TEXT("Sector %d (index) %s"), SectorIndex, bNewActive ? TEXT("ACTIVATED") : TEXT("deactivated"));
+}
+
+void ABattleSectorAnchor::ResetToInitialState()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// Fresh-match state: defenders own the point at full -1 progress. bResetSilently
+	// travels in the same replication bunch as OwningTeam, so neither the server nor
+	// clients fire a misleading "SECTOR RETAKEN" announcement for this reset.
+	bResetSilently = true;
+	OwningTeam = 1;
+	CaptureProgress = -1.f;
+	AttackersInZone = 0;
+	DefendersInZone = 0;
+	bWasCapturedOnce = false;
+	LastAnnouncedTeam = 1; // pre-seed: suppress the announce branch on the server too
+	ApplyAnchorColor();
+	ForceNetUpdate();
+	UE_LOG(LogTemp, Warning, TEXT("Sector %d reset to initial defender-owned state"), SectorIndex);
 }
 
 // Sets default values
@@ -268,6 +290,7 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			if (OwningTeam != 0)
 			{
 				OwningTeam = 0; // captured by attackers
+				bResetSilently = false; // a real capture re-enables announcements
 				UE_LOG(LogTemp, Warning, TEXT("Sector captured by attackers!"));
 				ApplyAnchorColor();
 			}
@@ -287,6 +310,7 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			if (OwningTeam != 1)
 			{
 				OwningTeam = 1; // held by defenders
+				bResetSilently = false; // a real reclaim re-enables announcements
 				UE_LOG(LogTemp, Warning, TEXT("Sector held by defenders!"));
 				ApplyAnchorColor();
 			}
@@ -307,6 +331,7 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			if (OwningTeam != 1)
 			{
 				OwningTeam = 1; // reverted to defenders (abandoned)
+				bResetSilently = false;
 				UE_LOG(LogTemp, Warning, TEXT("Sector reverted to defenders (abandoned)!"));
 				ApplyAnchorColor();
 			}
@@ -396,7 +421,7 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 	// Real-time capture-state announcement: on-screen big message + log, on BOTH server
 	// (called from Tick capture) and clients (called from OnRep_OwningTeam). Skip the very
 	// first application at BeginPlay so we don't announce the initial state.
-	if (bColorInitialized && OwningTeam != LastAnnouncedTeam)
+	if (bColorInitialized && OwningTeam != LastAnnouncedTeam && !bResetSilently)
 	{
 		FString Announce;
 		FColor AnnounceColor = FColor::White;
@@ -417,6 +442,13 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 			GEngine->AddOnScreenDebugMessage((uint64)-1, 5.f, AnnounceColor, Announce, true, FVector2D(2.0f, 2.0f));
 		}
 		UE_LOG(LogTemp, Warning, TEXT("%s"), *Announce);
+		LastAnnouncedTeam = OwningTeam;
+	}
+	// A round reset is deliberately quiet, but it must still refresh the baseline
+	// announcement state; otherwise the next real attacker capture could be mistaken
+	// for the previously announced capture and have no feedback.
+	if (bResetSilently)
+	{
 		LastAnnouncedTeam = OwningTeam;
 	}
 	bColorInitialized = true;

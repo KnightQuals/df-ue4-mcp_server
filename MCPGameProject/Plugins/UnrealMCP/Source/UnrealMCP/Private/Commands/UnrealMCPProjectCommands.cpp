@@ -187,7 +187,13 @@ TSharedPtr<FJsonObject> FUnrealMCPProjectCommands::HandleAddRow(const TSharedPtr
     Table->AddRow(FName(*RowName), *reinterpret_cast<FTableRowBase*>(RowData));
     FMemory::Free(RowData);
     Table->MarkPackageDirty();
-    if (!UEditorAssetLibrary::SaveLoadedAsset(Table, false))
+    // UEditorAssetLibrary::SaveLoadedAsset proved unreliable for this asset in
+    // UE4.27 (returned false with no detail). Save the package directly instead.
+    UPackage* TablePackage = Table->GetOutermost();
+    const FString TableFilename = FPackageName::LongPackageNameToFilename(TablePackage->GetName(), FPackageName::GetAssetPackageExtension());
+    const bool bTableSaved = UPackage::SavePackage(TablePackage, Table, RF_Public | RF_Standalone,
+        *TableFilename, GError, nullptr, false, true, SAVE_NoError);
+    if (!bTableSaved)
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Row added but failed to save DataTable: %s"), *TablePath));
     }

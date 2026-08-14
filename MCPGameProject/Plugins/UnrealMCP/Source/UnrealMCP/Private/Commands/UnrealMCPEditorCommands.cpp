@@ -32,6 +32,8 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "Engine/World.h"
+#include "GameFramework/WorldSettings.h"
+#include "GameFramework/GameModeBase.h"
 #include "ObjectTools.h"
 #include "Misc/OutputDeviceNull.h"
 
@@ -73,6 +75,10 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     else if (CommandType == TEXT("set_actor_property"))
     {
         return HandleSetActorProperty(Params);
+    }
+    else if (CommandType == TEXT("set_world_game_mode"))
+    {
+        return HandleSetWorldGameMode(Params);
     }
     // Set SkeletalMesh on an actor's SkeletalMeshComponent (Character GetMesh())
     // so users can pick a humanoid model via MCP.
@@ -463,6 +469,44 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const T
     }
 }
 
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetWorldGameMode(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ClassPath;
+    if (!Params->TryGetStringField(TEXT("class_path"), ClassPath) || ClassPath.IsEmpty())
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'class_path' parameter (e.g. /Game/Blueprints/BP_GameMode_Conquest.BP_GameMode_Conquest_C)"));
+    }
+
+    UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+    if (!World || !World->GetWorldSettings())
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("No editor WorldSettings available"));
+    }
+
+    UClass* GameModeClass = LoadClass<AGameModeBase>(nullptr, *ClassPath);
+    if (!GameModeClass)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Could not load GameMode class: %s"), *ClassPath));
+    }
+
+    AWorldSettings* Settings = World->GetWorldSettings();
+    Settings->Modify();
+    Settings->DefaultGameMode = GameModeClass;
+    Settings->MarkPackageDirty();
+
+    const bool bSaved = UEditorLoadingAndSavingUtils::SaveCurrentLevel();
+    if (!bSaved)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("GameMode set to %s but failed to save current map"), *ClassPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("level"), World->GetOutermost()->GetName());
+    ResultObj->SetStringField(TEXT("class_path"), ClassPath);
+    return ResultObj;
+}
+
 TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorSkeletalMesh(const TSharedPtr<FJsonObject>& Params)
 {
     FString ActorName;
@@ -618,9 +662,12 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDuplicateLevel(const TSh
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'destination_path' parameter (e.g. /Game/Maps/MainMap)"));
     }
-    // Duplicate UWorld using UE4's own ObjectTools path (the same primitive used by
-    // FileHelpers Save As), then explicitly save the resulting package. AssetTools /
-    // EditorAssetLibrary duplication rejects UWorld map assets in UE4.27.
+    // Map packages need engine-level duplication; raw .umap copies retain the source
+    // identity and trigger duplicate Map-ID warnings. UE4.27's ObjectTools route is
+    // stable when the source is not the active editor world. Guard the active-source
+    // case instead of crashing the entire editor (EXCEPTION_ACCESS_VIOLATION observed
+    // during NewMap -> BackUpMap snapshots). The orchestrator opens a different map
+    // first, then retries the same command.
     const FString SourceObjectPath = SourcePath + TEXT(".") + FPackageName::GetLongPackageAssetName(SourcePath);
     const FString DestinationObjectPath = DestinationPath + TEXT(".") + FPackageName::GetLongPackageAssetName(DestinationPath);
     UWorld* SourceWorld = LoadObject<UWorld>(nullptr, *SourceObjectPath);
@@ -631,6 +678,11 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDuplicateLevel(const TSh
     if (UEditorAssetLibrary::DoesAssetExist(DestinationObjectPath))
     {
         return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Destination already exists: %s"), *DestinationPath));
+    }
+    UWorld* ActiveWorld = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+    if (ActiveWorld && ActiveWorld->GetOutermost()->GetName() == SourcePath)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Source level is active: %s. Open a different level, then retry duplicate_level."), *SourcePath));
     }
 
     ObjectTools::FPackageGroupName NewPGN;

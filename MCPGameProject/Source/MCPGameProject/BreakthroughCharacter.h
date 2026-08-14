@@ -86,6 +86,10 @@ public:
 	// V2 config values supplied by GameMode / DataTable.
 	void ConfigureForbiddenZone(float InCountdownSeconds, float InRespawnDelaySeconds, float InSafeHalfExtentX, float InSafeHalfExtentY);
 
+	// Conquest round reset: GameMode teleports every human and defender AI back to
+	// the matching base and clears any forbidden-zone death/timer state. Authority-only.
+	void ResetForNewRound(const FVector& SpawnLocation, const FRotator& SpawnRotation);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -127,6 +131,8 @@ protected:
 	void OnRep_Eliminated();
 
 	void UpdateForbiddenZone(float DeltaTime);
+	// Local HUD hint for the current gameplay region (replaces removed 3D labels).
+	void UpdateAreaHint();
 	void EliminateInForbiddenZone();
 	void RespawnFromForbiddenZone();
 
@@ -139,6 +145,7 @@ protected:
 	float SafeHalfExtentY = 3600.f;
 	bool bWasInForbiddenZone = false;
 	int32 LastForbiddenDisplaySecond = -1;
+	FString LastShownArea;
 	FTimerHandle ForbiddenRespawnTimer;
 
 	// Pick a new random patrol target inside the box around PatrolCenter.

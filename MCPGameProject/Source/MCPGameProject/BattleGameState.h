@@ -28,6 +28,31 @@ public:
 	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
 	bool bConquestOver = false;
 
+	// Match countdown in whole seconds, server-broadcast once per second. The HUD
+	// renders this; clients never simulate their own clock. In round-based Conquest
+	// this counts down the CURRENT round.
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 RemainingMatchSeconds = 0;
+
+	// -1 = match running, 0 = attackers win, 1 = defenders win, 2 = draw (tied totals).
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 ConquestWinner = -1;
+
+	// Round-based "bell" Conquest (user redesign 2026-08-13): 1-based current round,
+	// total rounds, and each team's gain in the most recently resolved round (for
+	// the HUD round-result banner).
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 CurrentRound = 1;
+
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 TotalRounds = 3;
+
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 LastRoundAtkGain = 0;
+
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "V2|Conquest")
+	int32 LastRoundDefGain = 0;
+
 	// Authority-only score mutation. Team 0=attackers, Team 1=defenders.
 	void AddScore(int32 Team, int32 Amount);
 

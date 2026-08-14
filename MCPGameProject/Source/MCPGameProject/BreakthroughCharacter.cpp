@@ -16,6 +16,7 @@
 #include "EngineUtils.h"
 #include "SpawnAreaHub.h"
 #include "BattleAreaSpline.h"
+#include "Components/SplineComponent.h"
 
 void ABreakthroughCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -134,6 +135,42 @@ void ABreakthroughCharacter::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("Defender AI patrol started, center=%s radius=%.0f"),
 			*PatrolCenter.ToString(), PatrolRadius);
 	}
+}
+
+void ABreakthroughCharacter::ResetForNewRound(const FVector& SpawnLocation, const FRotator& SpawnRotation)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// Cancel a pending out-of-bounds respawn so it cannot overwrite the round reset
+	// a few seconds later. Then restore this pawn to a fresh, controllable state.
+	GetWorldTimerManager().ClearTimer(ForbiddenRespawnTimer);
+	SetActorLocationAndRotation(SpawnLocation, SpawnRotation, false, nullptr, ETeleportType::TeleportPhysics);
+	bIsEliminated = false;
+	bWasInForbiddenZone = false;
+	ForbiddenZoneOverlapCount = 0;
+	ForbiddenTimeRemaining = ForbiddenCountdownDuration;
+	LastForbiddenDisplaySecond = -1;
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->SetMovementMode(MOVE_Walking);
+	}
+
+	// The defender AI returns to its own base/patrol area too; humans simply remain
+	// player-controlled and receive their normal input immediately after the teleport.
+	if (Team == 1 && !IsPlayerControlled())
+	{
+		PatrolCenter = SpawnLocation;
+		PatrolTarget = FVector::ZeroVector;
+		PatrolWaitTimer = 0.5f;
+		bIsPatrolling = true;
+	}
+	ForceNetUpdate();
 }
 
 void ABreakthroughCharacter::SetForbiddenZoneOverlap(bool bEntering, const FString& SourceZone)
@@ -265,6 +302,54 @@ void ABreakthroughCharacter::UpdateForbiddenZone(float DeltaTime)
 	}
 }
 
+void ABreakthroughCharacter::UpdateAreaHint()
+{
+	// Local-player HUD hint only (cosmetic, no replication): shows which V2 gameplay
+	// region the player currently stands in, replacing the removed 3D floating labels.
+	if (!IsLocallyControlled() || !GEngine)
+	{
+		return;
+	}
+
+	const FVector Loc = GetActorLocation();
+	FString CurrentArea;
+	FColor AreaColor = FColor::White;
+
+	// First containing region wins on ties via smallest diagonal (a sector outline
+	// sits inside the big combat rectangle, so size ordering keeps the hint specific).
+	float BestDiagonal = FLT_MAX;
+	for (TActorIterator<ABattleAreaSpline> It(GetWorld()); It; ++It)
+	{
+		ABattleAreaSpline* Area = *It;
+		if (!Area || Area->bSafeArea || !Area->IsPointInside(Loc))
+		{
+			continue;
+		}
+		const FVector P0 = Area->BoundarySpline->GetLocationAtSplinePoint(0, ESplineCoordinateSpace::World);
+		const FVector P2 = Area->BoundarySpline->GetLocationAtSplinePoint(2, ESplineCoordinateSpace::World);
+		const float Diagonal = FVector::Dist2D(P0, P2);
+		if (Diagonal < BestDiagonal)
+		{
+			BestDiagonal = Diagonal;
+			CurrentArea = Area->AreaName;
+			AreaColor = Area->BoundaryColor.ToFColor(true);
+		}
+	}
+
+	if (CurrentArea.IsEmpty())
+	{
+		// Inside the safe battlefield but outside every named region.
+		CurrentArea = TEXT("BATTLEFIELD");
+	}
+
+	if (CurrentArea != LastShownArea)
+	{
+		LastShownArea = CurrentArea;
+		GEngine->AddOnScreenDebugMessage((uint64)-2, 3.f, AreaColor,
+			FString::Printf(TEXT("--- %s ---"), *CurrentArea), true, FVector2D(1.2f, 1.2f));
+	}
+}
+
 void ABreakthroughCharacter::EliminateInForbiddenZone()
 {
 	if (!HasAuthority() || bIsEliminated)
@@ -336,6 +421,7 @@ void ABreakthroughCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdateForbiddenZone(DeltaTime);
+	UpdateAreaHint();
 	if (bIsEliminated)
 	{
 		return;

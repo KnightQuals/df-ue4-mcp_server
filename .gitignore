@@ -178,3 +178,6 @@ MAP/
 
 # 编译日志
 build*.log
+
+# 交付包二进制(走GitHub Releases发布,不入Git历史)
+Release/*.zip
