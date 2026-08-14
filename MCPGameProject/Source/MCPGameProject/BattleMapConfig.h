@@ -37,11 +37,23 @@ struct MCPGAMEPROJECT_API FBattleMapConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|ForbiddenZone")
 	float ForbiddenBorderWidth = 1200.f;
 
-	// Capture progress gained per second for each-player advantage.
+	// Capture progress gained per second of advantage. Progress spans [-1, 1], so
+	// 0.4 means a full flip takes ~5 seconds (faster demo pacing, user request 2026-08-14).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Capture")
-	float CaptureSpeed = 1.f;
+	float CaptureSpeed = 0.4f;
 
 	// ===== V2 Conquest scoring =====
+	// Round-based "bell" scoring (user redesign 2026-08-13): each round lasts
+	// ConquestRoundSeconds; when the timer ends, every sector awards 1 point to its
+	// CURRENT owner; after ConquestRounds rounds the higher total wins, tie = draw.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Conquest")
+	int32 ConquestRounds = 3;
+
+	// 30s rounds for the demo build (user request 2026-08-14; was 60s).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Conquest")
+	float ConquestRoundSeconds = 30.f;
+
+	// Legacy continuous-trickle parameters, unused by round-based scoring.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "V2|Conquest")
 	int32 ConquestScoreToWin = 100;
 
