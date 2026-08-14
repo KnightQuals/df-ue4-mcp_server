@@ -8,6 +8,11 @@
 > 实习课题项目。目标：基于 MCP 协议 + LLM，让 AI 自动开发 UE4.27 C++ 游戏，
 > 最终由 AI 自动实现「全面战场 MiniGame」。核心 KPI = 打通「AI 写码 → 编译 → 进引擎建蓝图 → Play」的自动闭环。
 
+本仓库 = **UnrealMCP 插件（UE4.27 移植版）+ 用该系统开发出的完整「全面战场 MiniGame」**。
+在其他设备 clone 本仓库即可同时获得两者：插件位于 `MCPGameProject/Plugins/UnrealMCP/`，
+MiniGame 位于 `MCPGameProject/`（关卡、C++ 玩法、蓝图、配置）。玩法已打包为可直接运行的
+Windows 交付包（见下文「交付包玩法验证」）。
+
 ## 本项目与上游的关系
 
 本仓库以开源项目 [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp)（UE5.5）为基线，
@@ -16,162 +21,139 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度（W7，2026-08-06 —— V2 全部新增玩法落地，git 已同步）
+## 开发历程
 
-- [x] W4/W5 收尾（详见 WorkLog/2026-07-17.md、2026-08-03.md）
-- [x] **W6 MCP 接口大拓展**（7/27）：
-  - `get_actor_properties` 反射扩展 —— `TFieldIterator<UProperty>` 返回完整 UPROPERTY（OwningTeam/CaptureRadius/CaptureProgress 等）
-  - `save_level` / `new_level` / `open_level` —— AI 自主管理关卡
-  - DataTable 接口（`create_data_table` / `add_row` / `read_row`）—— V2 配置基础
-  - `spawn_actor` 加 `mesh_path` 参数（程序化 spawn StaticMesh）+ 重名崩溃修复（MakeUniqueObjectName）
-- [x] **W6 第一视角修复**（7/27）：加 FirstPersonCamera（眼高 64cm + bUsePawnControlRotation）+ `SetOwnerNoSee(true)`（玩家不见自己 Mannequin，防遮挡；AI 仍可见）
-- [x] **W6 守方 AI 巡逻**（7/29-7/30）：C++ 手动移动（无 NavMesh/BT）—— 随机选点走动 + 停顿 + Idle/Jog 动画切换，`SetActorLocation(bSweep=true)` 移动无 Controller pawn
-- [x] **W6 V1 玩法打磨**（7/30）：
-  - Shift 加速（Sprint 400/800）
-  - 占点变色 bug 根治（GetActorTeam 改用真实 Team 属性 + 运行时 NewObject 重建 CaptureZone 绕过蓝图组件模板残留）
-  - 玩家动画按速度切 Idle/Jog（第三方/多人可见）
-- [x] **W6 区域扩大 + 布局**（7/30-7/31）：SpawnHub 30m / CaptureZone 16m / SpawnHub 拉到 ±3000 / Floor Scale 30 / AI 巡逻半径 24m
-- [x] **W6 多人 Replication**（7/31）：Character bReplicates + Team 复制 + 巡逻仅 server；GameMode 延迟判断玩家数（单人 spawn AI / 多人跳过）；Anchor OnRep 同步变色（编译 0 error，待真机 2 窗口 PIE 验证）
-- [x] **W6 环境资源接入**（7/30-7/31）：KiteDemo（Open World Demo Collection）+ **XGE 卡死彻底修复**（禁 XGEController.uplugin）
-- [x] **★W6 关卡反复丢失根因★**（7/31）：`DefaultEngine.ini` 默认地图是引擎模板 OpenWorld，无 EditorStartupMap → 每次启动打开临时空地图。修复：`GameDefaultMap` + `EditorStartupMap` = `/Game/Maps/NewMap`
-- [x] **W6 环境装饰返工**（7/31-8/3）：巨石 scale 6-10 太大糊脸挡视野 → 删 11 个大装饰，改小尺度松树（scale 1.0-1.2）摆战场外围边缘（Y=±2800 两侧，避开中间走廊/据点），只做背景点缀
-- [x] **W7 V2 核心玩法：DataTable + 外围禁区**（8/4）：
-  - `FBattleMapConfig` + `DT_BattleMapConfig`（MapId = NewMap）：对局时长、禁区倒计时、重生等待、安全区尺寸、边界宽度、占点速度全部配置化
-  - `AForbiddenZone`：GameMode 动态生成东/西/南/北四条红色禁区带；内侧攻方基地/交战区/据点区/守方基地均为安全区
-  - 禁区规则：进区 10 秒实时倒计时 → 淘汰（隐藏/禁移动）→ 3 秒后按 Team 回所属 SpawnHub 重生；server authoritative + Replicated
-  - DataTable MCP 接口修复：由 transient table 改为 AssetTools 创建并保存资产，重启 UE 后 read_row 验证持久化
-- [x] **V1 存档点**（8/4）：通过新 `duplicate_level` MCP 接口从 NewMap 创建**独立 Map Asset ID**的 `MainMap` + `BackUpMap`（不用 raw copy `.umap`，避免重复资产 ID）；保留完整环境/石碑据点/双人玩法成果
-- [x] **W7 V2 多据点推进**（8/5）：Anchor 加 `SectorIndex`+`bIsActive`（Replicated）；SectorBase 自动发现/排序据点、顺序解锁；占领→公告→激活下一据点→全占攻方胜；NewMap 新增 Anchor_2（初始灰色 LOCKED）
-- [x] **W7 V2 Conquest 占领模式**（8/5）：`ABattleGameState`（双队比分 Replicated + 顶部比分显示）+ `AGameMode_Conquest`（全据点同时激活，按持有数每秒加分，先到 ScoreToWin 胜）+ `BP_GameMode_Conquest`；计分参数并入 DataTable
-- [x] **W7 V2 Spline 区域边界**（8/5）：`ABattleAreaSpline` 闭合样条多边形 + `IsPointInside` 射线法 + 绿色 SplineMesh 边界线；禁区判定优先用 Spline，回退矩形坐标判定；修复运行时 FObjectFinder 闪退（改 LoadObject）
-- [x] **W7 占点规则定版**（8/5-8/6，经多轮验收迭代）：
-  - 人数差推进：攻方人多→涨 / 守方人多→回退 / **对峙（人数相等）→ 冻结** / **空区 → 回退（弃点丢进度）**
-  - 修复：占领后红闪灰（红色保持=已占领语义）、对峙时进度仍走、触碰禁区边界倒计时重置（旧触发带 overlap 残留重置逻辑已移除）
-  - 据点颜色语义：**红=已被攻方占领 / 灰=未解锁 / 蓝=待占领**
-- [x] **三图管理铁律**（8/4-8/6）：MainMap=最稳存档（仅用户发话才覆盖）/ NewMap=工作台 / BackUpMap=每次加新功能前 duplicate_level 存 NewMap 旧版本（8/6 已快照占点定版版）
-- [ ] **收尾（请假 8/7、8/10，8/11 起）**：Spline 三区分明（基地/据点/交战区，复用 ABattleAreaSpline）+（可选）小地图 + **录 Demo + 写 wiki 架构文档（硬交付）**
-
-> **协作模式（7/30 与 cap 沟通后确定）**：AI 只写后端 C++ 代码 + 改 MCP 接口；UE 引擎前端操作（调蓝图 / 拖角色 / 导入资源 / Play）由用户手动做，AI 提供手把手教程。主 MainMap 保住已验证成果，环境实验在 NewMap 里做。
+| 阶段 | 时间 | 里程碑 |
+|---|---|---|
+| W1 | 6/15–6/20 | 环境搭建：UE4.27 + Rider + VS2019 工具链；跑通官方 C++ Quick Start |
+| W2 | 6/22–6/28 | unreal-mcp backport 启动：Python Server + C++ 插件移植；首批 MCP 接口跑通 |
+| W3 | 7/1–7/7 | 三条链路合体：cli-agent(CLI) 写码 → Build.bat 编译取报错 → UE MCP 建蓝图/Spawn；`compile.sh` + cli-agent 自闭环变色 |
+| W4 | 7/10–7/17 | 路 B `orchestrator.py` 一条命令跑通完整闭环；V1 据点/出生点/胜负判定骨架 |
+| W5 | 7/20–7/24 | V1 玩法成型：占点变色（石碑）、材质接口、双人分队雏形 |
+| W6 | 7/27–8/3 | 第一视角、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、XGE 卡死根治、关卡默认地图修复 |
+| W7 | 8/4–8/11 | **V2 核心玩法全量**：DataTable 配置、外围禁区淘汰重生、多据点推进、Conquest 模式、Spline 区域边界、占点规则定版、三区可视化 |
+| W8 | 8/12–8/14 | **交付定版**：正式 HUD（比分/倒计时/进度条）、三局铃声结算、回合战场重置、Windows 交付包（单人/双人脚本）、环境植被点缀、交付 cap |
 
 详细按天记录见 `WorkLog/`。
 
-## 自动化闭环（路 B orchestrator）
+## 已完成：全面战场 MiniGame（V1 + V2，已交付）
 
-`orchestrator.py`（仓库根目录）是课题核心交付物——一条命令跑通完整闭环：
+> 下表「课题要求」= mentor 原始需求；「自研扩展」= 开发中沉淀的新设计。两者现已全部落地。
 
-```bash
-python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderCamp"
-```
+### 课题原始要求（全部完成，对照 课题 需求文档）
 
-流程：关 UE → cli-agent + GLM-5.2 自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → cli-agent 用 MCP 建蓝图 + spawn。实时显示 cli-agent 的思考 / 工具调用 / 结果（stream-json 解析）。
+| 要求 | 实现 |
+|---|---|
+| 大战场核心玩法：争夺区域 `BattleSectorBase`，攻方出生在左侧攻方基地（`BattleCampSector`），守方出生在右侧守方基地，两阵营争夺据点（`BattleSectorAnchor`） | 全套类落地：`ABattleSectorBase` / `ABattleSectorAnchor` / `ABattleCampSector` / `ABattleDefenderCamp` + `ASpawnAreaHub` |
+| 据点被攻方占领后，切换到下一区域继续争夺 | 多据点推进：Anchor_1 被占后公告并解锁 Anchor_2，全占攻方胜 |
+| 双玩法模式：攻防（Breakthrough）+ 占领（Conquest） | `AGameMode_Breakthrough`（顺序推进）/ `AGameMode_Conquest`（铃声结算），各配蓝图子类 |
+| 玩法共享引擎基础（GameState / PlayerController / Character / PlayerState） | `ABattleGameState`（比分/回合/倒计时 Replicated）、自定义 PlayerController、`ABreakthroughCharacter`（Team/移动/动画全同步） |
+| 多人（≥2 人）并分配到不同阵营（攻=0，守=1） | GameMode 按加入顺序自动分队；单人自动补守方 AI，双人时 AI 自动退场 |
+| 双方在自己基地出生，向目标区域行军进入据点区域 | 双 SpawnHub 随机出生点 + 五类区域标线引导 |
+| 据点默认守方拥有，进度值 -1（守方占领） | CaptureProgress 连续模型 [-1, 1]，初始 -1 |
+| 攻方人数优势：进度 -1→0（中立）→+1（完全占领）；守方优势反向 | 人数差推进：攻多涨 / 守多退 / 对峙冻结 / 空区回退（弃点丢进度） |
+| 配置时间内攻方占领完毕攻方胜，反之守方胜 | MatchDuration 倒计时胜负判定（Breakthrough）；Conquest 另有总分判定 |
+| V2：用 Spline 制作基地、交战区域、据点区域范围 | `ABattleAreaSpline` 闭合样条 + 射线法内外判定 + 五类区域贴地标线（可编辑器拖点改形） |
+| V2：安全区/禁区划分，进入禁区倒计时 10s 后死亡 | 外围禁区：位置判定 10s 淘汰 + 3s 按阵营重生（敌方基地算禁区的细则经评估简化为不做） |
+| V2：DataTable 配置对局时间、禁区倒计时，每行 Key=MapID | `DT_BattleMapConfig`，Key=NewMap，12 项参数全配置化 |
 
-**已解决的坑**：① cli-agent Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（ACC_PRODUCT_CONFIG_V3 34 万字符撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
+### 自研扩展玩法（全部完成）
 
-## V1 玩法代码（MCPGameProject/Source/MCPGameProject/）
+| 功能 | 说明 |
+|---|---|
+| 石碑据点变色 | 据点换 GroundRevealRock 岩石模型 + 动态材质：红=攻方已占 / 蓝=守方待占 / 灰=未解锁，全屏公告 |
+| 守方 AI 巡逻 | 纯 C++ 巡逻（无 NavMesh/BT）：随机选点走动 + 停顿 + Idle/Jog 动画切换；单人模式自动补位，双人模式自动退场 |
+| 第一视角 | 眼高相机 + OwnerNoSee 本体隐藏；Shift 加速（400/800）、空格跳跃 |
+| 外围禁区 | 安全区外 10s 倒计时淘汰 → 3s 按阵营重生；server 裁定 + Replicated；边界行走不误判 |
+| DataTable 配置 | `DT_BattleMapConfig`（Key=NewMap）：对局时长、禁区倒计时、重生、安全区尺寸、占点速度、Conquest 参数全部配置化 |
+| 多据点推进（Breakthrough） | 据点 1 解锁据点 2，全占攻方胜、超时守方胜 |
+| Conquest 三局铃声结算 | 3 局 × 30s；每局结束按该瞬间据点归属结算（2-0/1-1/0-2），总分高者胜、平分平局；每局结束全员回出生点、据点复原 |
+| 五类区域可视化 | 攻/守基地、交战区、据点区、安全区的贴地彩色标线（Spline 可编辑多边形）+ 玩家所在区域 HUD 提示 |
+| 正式 HUD | 顶部攻红守蓝比分 + 局数 + 倒计时 + 上局结算；据点内红蓝拉锯占点进度条 + 状态文字；终局胜负 Banner |
+| 战场环境 | KiteDemo 开放世界资产：外围树木/岩石/植被点缀 + 场内边缘层次（不影响玩法交互） |
 
-| 类 | 状态 | 作用 |
-|---|---|---|
-| `ABattleSectorAnchor` | ✅ 已建 + 验收 + 多据点 | 据点：Overlap 计数 + **人数差推进**（攻多→涨/守多→退/对峙→冻结/空区→回退）+ `SectorIndex`/`bIsActive`（推进顺序+锁定）+ 变色（红=已占/灰=未解锁/蓝=待占）+ OwningTeam/CaptureProgress **Replicated** |
-| `ABattleCampSector` | ✅ 已建 | 攻方基地（Cube 外形） |
-| `ABattleDefenderCamp` | ✅ 已建 | 守方基地（Cube 外形） |
-| `ABattleSectorBase` | ✅ 胜负判定+多据点推进 | 区域容器 + MatchDuration 倒计时 + 胜负判定 + **V2 顺序解锁据点**（自动发现排序、占领→公告→激活下一、全占攻方胜） |
-| `ASpawnAreaHub` | ✅ 已建（7/16）+ 视觉化 | 出生点集（TArray SpawnPoints + GetRandomSpawnPoint）+ Team 属性 + BoxComponent 线框 + TextRender 文字 |
-| `ABreakthroughCharacter` | ✅ 已建 + 多人 + V2淘汰重生 | 玩家/AI Character：Team（**Replicated**）+ FirstPersonCamera + Mannequin（OwnerNoSee）+ AI C++ 巡逻（SetActorLocation sweep + Idle/Jog）+ Shift/空格跳跃 + **禁区倒计时/淘汰/按阵营重生（Replicated，位置判定+Spline 优先）** |
-| `AForbiddenZone` | ✅ V2（8/4） | 外围禁区条：红色薄边界/警示文字，仅视觉警示；倒计时由 Character 位置判定驱动 |
-| `ABattleAreaSpline` | ✅ V2（8/5） | 闭合样条安全区：USplineComponent 多边形 + IsPointInside 射线法 + 绿色边界线；编辑器可拖点改形状 |
-| `ABattleGameState` | ✅ V2（8/5） | Conquest 共享状态：AttackerScore/DefenderScore/ScoreToWin Replicated + 顶部比分显示 |
-| `FBattleMapConfig` | ✅ V2（8/4-8/5） | DataTable Row（MapId）：对局时长、禁区倒计时/重生/边界、安全范围、占点速度、Conquest 计分三项 |
-| `ADefaultPlayerController` | ✅ 已建（7/16） | 玩家控制器（V1 空实现用引擎默认输入） |
-| `AGameMode_Breakthrough` | ✅ 已建 + 多人 + V2配置 | 双 SpawnHub 按 Team 分队；单人 AI/双人真人分攻守；BeginPlay 加载 DataTable + 生成禁区带 + 生成 Spline 安全边界 |
-| `AGameMode_Conquest` | ✅ V2（8/5） | 占领模式（继承 Breakthrough）：全据点同时激活 + 持有据点数持续得分 + 先到 ScoreToWin 胜 |
+### Windows 交付包（Release/）
 
-## 未来计划（Roadmap）
+- Development 配置、默认窗口化（单人 1280×720；双人两个 960×540 窗口左右排列）
+- `Play_Solo.bat` 单人试玩；`Play_Local_2P.bat` 同机双人（主机 `?listen` + 本机客户端）
+- 动态资产（动画/材质/岩石）已全部强制 Cook；运行冒烟验证通过
+- 二进制包体积约 657MB，**存放于 GitHub Releases**（Git 单文件 100MB 限制），源码侧在 `Release/` 保留说明
 
-### V1 待补（玩法完整度）
-- [x] **出生点 `ASpawnAreaHub`**（7/16 完成）：TArray SpawnPoints + GetRandomSpawnPoint
-- [x] **胜负判定**（7/16 完成）：ABattleSectorBase Tick 倒计时 + bMatchOver + 时间到判攻守胜
-- [x] **材质变色**（7/15 完成）：MCP 材质接口让 AI 自主建材质，用户 Play 确认据点变色
-- [x] **占点玩法验收**（7/30 完成）：玩家进 CaptureZone 2s 倒数 → 变色（初始蓝守方 → 攻方占领变红）
-- [x] **守方 AI 巡逻**（7/30 完成）：C++ 手动巡逻 + Idle/Jog 动画，防守区内闲逛
-- [x] **Shift 加速**（7/30 完成）：Sprint 400/800
-- [x] **多人 Replication**（7/31 完成，编译通过）：Character/Anchor/GameMode 网络复制，2 player 分攻守
-- [ ] **多人 2 窗口 PIE 真机验证**：Play 选 2 players + Listen Server，验证双人对战 + 占点同步变色
-- [ ] **环境定版**：NewMap 外围小树点缀视觉确认（不挡视野）
+## 已完成：MCP 接口清单（L2 自动化系统）
 
-### V2 详细设计（课题 全面战场 V2）
-- [x] **DataTable 配置**（8/4）：`DT_BattleMapConfig`，Key = `NewMap`；对局时间 / 禁区倒计时 / 重生等待 / 安全范围 / 禁区带宽度 / 据点速度 / Conquest 计分配置化。MCP create/add/read 接口已修为持久资产。
-- [x] **安全区 / 禁区机制**（8/4）：安全区外全部区域为禁区，位置判定（Spline 优先）10 秒倒计时淘汰，3 秒按阵营重生。server authoritative + Replicated。
-- [x] **Spline 区域边界**（8/5）：`ABattleAreaSpline` 闭合样条 + 边界线可视化 + 多边形内检测；外围安全区已用 Spline（待做：基地/据点/交战区三区 Spline 分明）
-- [x] **GameMode 两种**（8/5）：Breakthrough（攻防，含多据点顺序推进）+ Conquest（占领，持有据点持续得分）
-- [ ] **Spline 三区**：基地/据点/交战区独立 Spline 区域 + 颜色区分（复用 ABattleAreaSpline）
-- [ ] **小地图**（待定）：左上角俯拍小地图，需 UMG/SceneCapture 接口，性价比低
-- [ ] **多人同步进阶**：Server/Client RPC + PlayerState 计分（V1/V2 已打通 Replicated 基础）
+按能力分组，全部为 UE4.27 backport 后实测可用的接口：
 
-### MCP 接口拓展（L2 自动化系统扩展）
-**策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。持续验证成功。
-- [x] **材质接口**（7/15 完成）：`UnrealMCPMaterialCommands`（create_material / add_vector_parameter / set_material_on_component）
-- [x] **FClassProperty 分支**（7/17 完成）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等）
-- [x] **日志接口**（7/17 完成）：`get_output_log` 读 UE 输出日志（FILEREAD_AllowWrite 修复独占写）
-- [x] **反射属性**（7/27 完成）：`get_actor_properties` 用 TFieldIterator 返回完整 UPROPERTY
-- [x] **关卡接口**（7/27-8/4）：`save_level` / `new_level` / `open_level` / **`duplicate_level`**。duplicate_level 用 UE4 ObjectTools 创建独立 UWorld/Package，规避 raw copy `.umap` 的 Duplicate PrimaryAssetID
-- [x] **DataTable 接口**（7/27 完成）：`create_data_table` / `add_row` / `read_row`
-- [x] **mesh 摆放**（7/30 完成）：`spawn_actor` 加 `mesh_path` 参数（程序化 spawn StaticMesh）+ 重名崩溃修复（MakeUniqueObjectName）
-- [ ] **资产接口**：`create_asset` / `import_texture` / `set_default_material`（Content Browser 操作）
-- [ ] **GameMode 接口**：`set_game_mode` / `start_match`（V2 流程）
+| 分组 | 接口 |
+|---|---|
+| Actor 操作 | `spawn_actor`（含 `mesh_path` 程序化摆放 + 重名防崩）/ `delete_actor` / `set_actor_transform` / `find_actors_by_name` / `get_actors_in_level` / `set_actor_skeletal_mesh` / `spawn_blueprint_actor` |
+| 属性与反射 | `get_actor_properties`（TFieldIterator 全量 UPROPERTY）/ `set_actor_property`（含 UClass* 引用分支） |
+| 蓝图 | `create_blueprint` / `add_component_to_blueprint` / `set_component_property` / `compile_blueprint` / `set_blueprint_property` / `set_physics_properties` / 节点图操作（add_event/function/variable、connect 等） |
+| 材质 | `create_material` / `add_vector_parameter` / `set_material_on_component` |
+| 关卡管理 | `save_level` / `new_level` / `open_level` / `duplicate_level`（独立 Map Asset ID；活跃关卡崩溃已修为受控报错） |
+| DataTable | `create_data_table` / `add_row`（含保存落盘修复）/ `read_row` |
+| 工程与日志 | `create_input_mapping` / `get_output_log`（读 UE 输出日志） |
+| 视口 | `focus_viewport` / `take_screenshot` |
+| Editor-only Commandlet | `MCPConfigureMap`（无界面设 GameMode / 关卡快照） |
 
-### 收尾
-- [ ] 录 Demo（一条命令跑通完整闭环视频）
-- [ ] 写 wiki 系统架构文档（mentor 要求）
-- [ ] 整理 GitHub 仓库（README 持续更新）
+自动化闭环交付物：`orchestrator.py`（仓库根目录）——一条命令：关 UE → cli-agent+GLM-5.2 写 C++ → 编译（清超长环境变量）→ 报错自修（≤3 轮）→ 起 UE → MCP 建蓝图/Spawn，全程实时输出。
 
 ## 架构（三块）
 
-1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），
-   接收命令并调用引擎 API 建蓝图/改参数/spawn。← backport 的主战场。
+1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），接收命令并调用引擎 API 建蓝图/改参数/spawn。← backport 的主战场。
 2. **Python MCP Server** — `Python/`，基于 FastMCP，向 AI 客户端暴露工具（JSON Schema），把工具调用翻译成 TCP 命令。
-3. **示例工程 MCPGameProject** — UE4.27 空白工程 + 已配置好的插件，用于验证。
+3. **MCPGameProject** — 不再是空白工程：内含用本系统开发完成的**全面战场 MiniGame**（玩法见上文），同时仍是插件的验证环境。
 
 ## 快速开始（UE4.27）
 
 1. **clone 后下载 AnimStarterPack**（Mannequin mesh + 动画，BreakthroughCharacter 引用）：
    - 打开 Epic Games Launcher → 商城 → 搜索 `Animation Starter Pack` → 添加到项目 → 选 MCPGameProject
-   - 或手动放到 `MCPGameProject/Content/AnimStarterPack/`（路径要对，C++ 用 `FObjectFinder` 加载 `/Game/AnimStarterPack/UE4_Mannequin/Mesh/SK_Mannequin`）
+   - 或手动放到 `MCPGameProject/Content/AnimStarterPack/`
 2. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
 3. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
 4. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
-5. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
-   `scripts/blueprints/test_create_and_spawn_cube_blueprint.py`。
+5. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`。
 
-## V1 玩法验证
+## 交付包玩法验证
 
-> 两张关卡：**MainMap** = 已验证的双人 + 占点主玩法（保住成果）；**NewMap** = 环境装饰实验（外围小树点缀）。`EditorStartupMap` 默认加载其一。
+> 三图管理：**MainMap** = 稳定存档（仅明确授权才覆盖）；**NewMap** = 工作台（当前玩法全量）；**BackUpMap** = 每次大改前的回退快照。
 
-### 单人验证
-1. UE 打开后加载关卡（已含攻方/守方基地 @ ±3000、据点 Anchor_1 @ 中心、SectorBase、Floor Scale 30）。
-2. WorldSettings → DefaultGameMode = `BP_GameMode_Breakthrough`（如丢失，用 MCP `set_actor_property` 重设）。
-3. ▶ Play → 攻方玩家在 SpawnHub_Attacker 出生 → **Shift 加速**走到中间 Anchor_1 → 站 2s 倒数 → 据点变红（攻方占领）。
-4. 守方 AI（Mannequin + Jog 动画）在守方基地 24m 范围内巡逻走动（不越界）。
+### 直接运行（推荐）
 
-### 多人（2 Player）验证
-1. 顶部工具栏 ▶ 旁下拉 → **Number of Players = 2** + **Net Mode = Play As Listen Server**。
-2. ▶ Play → 弹出两个窗口：玩家 1 = 攻方（左），玩家 2 = 守方（右），此时不 spawn AI。
-3. 两窗口能看到对方角色移动、朝向、跳跃（Replication）；攻方占领据点时两个窗口同步变红与显示占领公告（OnRep）。
+解压 Release 交付包，在 `WindowsNoEditor/` 下：
 
-### V2 外围禁区验证（单人/双人均可）
-1. Play 后，红色细边界和 `FORBIDDEN ZONE - RETURN TO BATTLEFIELD` 文字围住基地/交战区/据点组成的安全区。
-2. 穿过红线到场地外：屏幕显示 `WARNING: FORBIDDEN ZONE - RETURN IN 10`，每秒递减。
-3. 10 秒内返回边界内：倒计时取消并恢复为 10 秒；若停在外面：角色淘汰、隐藏且不能移动，约 3 秒后从所属阵营基地重生。
-4. 关卡参数可在 `Content/Config/DT_BattleMapConfig` 的 `NewMap` 行统一调整，不必改 C++。
+1. **`Play_Solo.bat`**：单人。你是攻方，1.5 秒后系统补一个守方 AI 巡逻。
+2. **`Play_Local_2P.bat`**：同机双人。先弹主机窗口（攻方），3 秒后弹客户端窗口（守方），自动分队。
 
-## 已知环境注意事项（backport 踩坑记录）
+### 玩法规则（Conquest 三局铃声结算）
 
-- **工具链**：UE4.27 需 VS2019（MSVC v142）；UE5.5 需 VS2022（v143）。二者可共存。
-- **XGE / IncrediBuild（重要）**：若 IncrediBuild 授权失效，UE4.27 会把着色器派给 XGE 并卡死（SpeedTree/KiteDemo 尤其明显，卡 70% 死）。
-  彻底解决（三重，最后一个最关键）：① `Engine/Config/ConsoleVariables.ini` 取消注释 `r.XGEShaderCompile = 0`；② `BaseEngine.ini [DevOptions.Shaders]` 加 `bAllowDistributedCompilingWithXGE=False`；③ **`Engine/Plugins/XGEController/XGEController.uplugin` 设 `EnabledByDefault=false`**（禁插件，UE 找不到 XGE 只能本地编译）。
-- **命名铁律**：项目名/路径/类名全程纯英文+数字（中文路径会导致 UnrealHeaderTool 乱码）。
-- **默认地图必须设**：`DefaultEngine.ini` 的 `GameDefaultMap` + `EditorStartupMap` 都要指向项目关卡，否则 UE 每次启动打开引擎模板/临时地图，spawn 的 actor 一关就丢。
-- **C++ 改蓝图继承的组件类型**（如 Sphere→Box）会留序列化残留，recompile 清不掉 → 运行时 `NewObject` 重建组件规避。
-- **地图备份/存档**：禁止直接复制 `.umap` 到 `Content/Maps`，否则内部 `PrimaryAssetID` 重复并报警。外部文件备份放 `MAP/`；要在 Content 内创建可打开的独立存档，调用 `duplicate_level('/Game/Maps/NewMap', '/Game/Maps/MainMap')`。
+- 共 3 局 × 30 秒；两个据点开局都归守方。
+- 站进据点半径约 5 秒翻转归属（红蓝进度条实时显示）；**占下的点没人守会自动向守方回退**。
+- 每局倒计时归零时按该瞬间归属结算：两点全归一方 = 2:0，各占一个 = 1:1。
+- 每局结束全员回出生点、据点复原；三局后比总分，平分 = DRAW。
+
+### 编辑器内验证
+
+1. UE 打开项目（默认加载 NewMap，其 WorldSettings 已锁定 `BP_GameMode_Conquest`）。
+2. ▶ Play 即进入上述对局；双人：Play 下拉 → Number of Players = 2 → Play As Listen Server。
+
+## 未来计划（下周）
+
+- [ ] **简易符号化小地图**：跟随玩家主视角与位置，符号化显示据点归属与双方位置（NewMap 内先试，BackUpMap 已留回退点）
+- [ ] **HUD 汉化**：比分板、进度条、公告等界面文案中文化
+- [ ] **cap 验收反馈修改**：交付包试玩后的意见一并处理
+- [ ] （可选）环境氛围深化：光照/雾效/天空调校、植被密度
+- [ ] 课题硬交付收尾：Demo 录制 + wiki 系统架构文档
+
+## 已知环境注意事项
+
+- **工具链**：UE4.27 + VS2019（MSVC v142）。编译前清掉 >1000 字符的环境变量（某些企业软件注入的 `ACC_PRODUCT_CONFIG_V3` 会撑爆 Windows 环境块 65535 限制）。
+- **XGE / IncrediBuild**：授权失效会导致着色器编译卡死。已禁用 `XGEController.uplugin`（`EnabledByDefault=false`）回退本地编译。
+- **Cook/打包环境**：精简 PATH 时必须保留 UE 引擎与 EnhancedInput 的 Binaries\Win64 目录，否则 Cook 阶段项目 DLL 加载失败；editor-only 代码（引用 UnrealEd/ObjectTools）必须 `#if WITH_EDITOR` 隔离并提供运行态 stub；动态 `LoadObject` 的资产需 `DirectoriesToAlwaysCook` 强制打包。
+- **命名铁律**：项目名/路径/类名全程纯英文+数字（中文会导致 UnrealHeaderTool 乱码）。
+- **默认地图必须设**：`DefaultEngine.ini` 的 `GameDefaultMap` + `EditorStartupMap` 都指向项目关卡，否则每次启动打开临时地图、动态 spawn 全丢。
+- **地图备份**：禁止 raw copy `.umap`（PrimaryAssetID 重复）；用 `duplicate_level` 接口或 `MCPConfigureMap -SnapshotSource/-SnapshotDestination`（无界面、可覆盖需先删目标）。
+- **DataTable 写盘**：`add_row` 保存用 `UPackage::SavePackage` 直存；若偶发保存失败，重开编辑器会话后重试（会话内保存状态可能被污染）。
+- **改插件后必须重启 UE** 才加载新 DLL。
 
 ---
 
@@ -182,25 +164,11 @@ This project enables AI assistant clients like Cursor, Windsurf and Claude Deskt
 
 ## ⚠️ Experimental Status
 
-This project is currently in an **EXPERIMENTAL** state (upstream note). The API, functionality, and implementation details are subject to significant changes:
-
-- Breaking changes may occur without notice
-- Features may be incomplete or unstable
-- Documentation may be outdated or missing
-- Production use is not recommended at this time
+This project is currently in an **EXPERIMENTAL** state (upstream note). The API, functionality, and implementation details are subject to significant changes.
 
 ## 🌟 Overview
 
-The Unreal MCP integration provides comprehensive tools for controlling Unreal Engine through natural language:
-
-| Category | Capabilities |
-|----------|-------------|
-| **Actor Management** | • Create and delete actors (cubes, spheres, lights, cameras, etc.)<br>• Set actor transforms (position, rotation, scale)<br>• Query actor properties and find actors by name<br>• List all actors in the current level |
-| **Blueprint Development** | • Create new Blueprint classes with custom components<br>• Add and configure components (mesh, camera, light, etc.)<br>• Set component properties and physics settings<br>• Compile Blueprints and spawn Blueprint actors<br>• Create input mappings for player controls |
-| **Blueprint Node Graph** | • Add event nodes (BeginPlay, Tick, etc.)<br>• Create function call nodes and connect them<br>• Add variables with custom types and default values<br>• Create component and self references<br>• Find and manage nodes in the graph |
-| **Editor Control** | • Focus viewport on specific actors or locations<br>• Control viewport camera orientation and distance |
-
-All these capabilities are accessible through natural language commands via AI assistants, making it easy to automate and control Unreal Engine workflows.
+The Unreal MCP integration provides comprehensive tools for controlling Unreal Engine through natural language: actor management, blueprint development, blueprint node graph editing, and editor control — all accessible through natural language commands via AI assistants.
 
 ## 🧩 Components
 
@@ -214,111 +182,13 @@ All these capabilities are accessible through natural language commands via AI a
 - Handles command execution and response handling
 
 ### Python MCP Server `Python/unreal_mcp_server.py`
-- Implemented in `unreal_mcp_server.py`
 - Manages TCP socket connections to the C++ plugin (port 55557)
-- Handles command serialization and response parsing
-- Provides error handling and connection management
 - Loads and registers tool modules from the `tools` directory
 - Uses the FastMCP library to implement the Model Context Protocol
-
-## 📂 Directory Structure
-
-- **MCPGameProject/** - Example Unreal project
-  - **Plugins/UnrealMCP/** - C++ plugin source
-    - **Source/UnrealMCP/** - Plugin source code
-    - **UnrealMCP.uplugin** - Plugin definition
-
-- **Python/** - Python server and tools
-  - **tools/** - Tool modules for actor, editor, and blueprint operations
-  - **scripts/** - Example scripts and demos
-
-- **Docs/** - Comprehensive documentation
-  - See [Docs/README.md](Docs/README.md) for documentation index
-
-## 🚀 Quick Start Guide
-
-### Prerequisites
-- Unreal Engine 5.5+
-- Python 3.12+
-- MCP Client (e.g., Claude Desktop, Cursor, Windsurf)
-
-### Sample project
-
-For getting started quickly, feel free to use the starter project in `MCPGameProject`. This is a UE 5.5 Blank Starter Project with the `UnrealMCP.uplugin` already configured. 
-
-1. **Prepare the project**
-   - Right-click your .uproject file
-   - Generate Visual Studio project files
-2. **Build the project (including the plugin)**
-   - Open solution (`.sln`)
-   - Choose `Development Editor` as your target.
-   - Build
-
-### Plugin
-Otherwise, if you want to use the plugin in your existing project:
-
-1. **Copy the plugin to your project**
-   - Copy `MCPGameProject/Plugins/UnrealMCP` to your project's Plugins folder
-
-2. **Enable the plugin**
-   - Edit > Plugins
-   - Find "UnrealMCP" in Editor category
-   - Enable the plugin
-   - Restart editor when prompted
-
-3. **Build the plugin**
-   - Right-click your .uproject file
-   - Generate Visual Studio project files
-   - Open solution (`.sln)
-   - Build with your target platform and output settings
-
-### Python Server Setup
-
-See [Python/README.md](Python/README.md) for detailed Python setup instructions, including:
-- Setting up your Python environment
-- Running the MCP server
-- Using direct or server-based connections
-
-### Configuring your MCP Client
-
-Use the following JSON for your mcp configuration based on your MCP client.
-
-```json
-{
-  "mcpServers": {
-    "unrealMCP": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "<path/to/the/folder/PYTHON>",
-        "run",
-        "unreal_mcp_server.py"
-      ]
-    }
-  }
-}
-```
-
-An example is found in `mcp.json`
-
-### MCP Configuration Locations
-
-Depending on which MCP client you're using, the configuration file location will differ:
-
-| MCP Client | Configuration File Location | Notes |
-|------------|------------------------------|-------|
-| Claude Desktop | `~/.config/claude-desktop/mcp.json` | On Windows: `%USERPROFILE%\.config\claude-desktop\mcp.json` |
-| Cursor | `.cursor/mcp.json` | Located in your project root directory |
-| Windsurf | `~/.config/windsurf/mcp.json` | On Windows: `%USERPROFILE%\.config\windsurf\mcp.json` |
-
-Each client uses the same JSON format as shown in the example above. 
-Simply place the configuration in the appropriate location for your MCP client.
-
 
 ## License
 MIT
 
 ## Questions
-
-For questions, you can reach me on X/Twitter: [@chongdashu](https://www.x.com/chongdashu)
+For questions, you can reach the upstream author on X/Twitter: [@chongdashu](https://www.x.com/chongdashu)
 </details>
