@@ -24,6 +24,13 @@ public class MCPGameProject : ModuleRules
 			// "OnlineSubsystem"
 		});
 
+		// Commandlets that edit/save a .umap are editor-only; keep UnrealEd out of
+		// non-editor targets so packaged builds stay clean.
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
+
 		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
 	}
 }
