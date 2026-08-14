@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "GameMode_Breakthrough.h"
+#include "BattleHUD.h"
 #include "SpawnAreaHub.h"
 #include "BreakthroughCharacter.h"
 #include "BattleSectorAnchor.h"
@@ -19,6 +20,9 @@ AGameMode_Breakthrough::AGameMode_Breakthrough()
 {
 	DefaultPawnClass = ABreakthroughCharacter::StaticClass();
 	PlayerControllerClass = ADefaultPlayerController::StaticClass();
+	// Real battle HUD (scoreboard + countdown + capture bar) for this mode and,
+	// through inheritance, for Conquest as well.
+	HUDClass = ABattleHUD::StaticClass();
 }
 
 void AGameMode_Breakthrough::BeginPlay()
@@ -44,6 +48,7 @@ void AGameMode_Breakthrough::BeginPlay()
 	LoadAndApplyMapConfig();
 	SpawnForbiddenZoneBorders();
 	SpawnSafeBattlefieldSpline();
+	SpawnGameplayAreaSplines();
 
 	UE_LOG(LogTemp, Warning, TEXT("GameMode_Breakthrough started, AttackerHub=%s DefenderHub=%s MapId=%s"),
 		AttackerHub ? *AttackerHub->GetName() : TEXT("None"),
@@ -150,6 +155,64 @@ void AGameMode_Breakthrough::SpawnSafeBattlefieldSpline()
 	}
 }
 
+void AGameMode_Breakthrough::SpawnGameplayAreaSplines()
+{
+	if (!HasAuthority() || GameplayAreaSplines.Num() > 0)
+	{
+		return;
+	}
+
+	// Display-only V2 regions. These deliberately sit inside the outer green safe
+	// boundary: they explain the battlefield layout without changing forbidden-zone
+	// rules or blocking player movement/capture triggers.
+	auto SpawnArea = [this](const FName& Name, const FVector& Center, const FVector2D& HalfExtent,
+		const FString& Label, const FLinearColor& Color)
+	{
+		FActorSpawnParameters Params;
+		Params.Name = Name;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ABattleAreaSpline* Area = GetWorld()->SpawnActor<ABattleAreaSpline>(ABattleAreaSpline::StaticClass(), Center, FRotator::ZeroRotator, Params);
+		if (Area)
+		{
+			Area->ConfigureGameplayArea(Label, Color, HalfExtent.X, HalfExtent.Y);
+			GameplayAreaSplines.Add(Area);
+		}
+	};
+
+	// Base boxes span from the combat-area edge all the way back to the safe
+	// boundary, so no unlabeled strip remains behind the base. History: hub-
+	// centered boxes first used halfX=1250 (left edge X=1750 cut through the
+	// Anchor_2 rock at X=1800), then 750 (rear edge X=3750 read as a mystery
+	// line between base and map edge). Now derived from config: inner edge =
+	// combat half (2250), outer edge = safe half (DataTable, 4500).
+	const float CombatHalfX = 2250.f;
+	const float SafeHalfX = ActiveMapConfig.SafeHalfExtentX;
+	const float BaseHalfX = FMath::Max(100.f, (SafeHalfX - CombatHalfX) * 0.5f);
+	const float BaseCenterX = CombatHalfX + BaseHalfX; // 3375 with default config
+	SpawnArea(TEXT("Spline_AttackerBase"), FVector(-BaseCenterX, 0.f, 0.f), FVector2D(BaseHalfX, 1500.f),
+		TEXT("ATTACKER BASE"), FLinearColor(1.f, 0.08f, 0.05f));
+	SpawnArea(TEXT("Spline_DefenderBase"), FVector(BaseCenterX, 0.f, 0.f), FVector2D(BaseHalfX, 1500.f),
+		TEXT("DEFENDER BASE"), FLinearColor(0.05f, 0.3f, 1.f));
+	SpawnArea(TEXT("Spline_CombatArea"), FVector(0.f, 0.f, 0.f), FVector2D(CombatHalfX, 2600.f),
+		TEXT("COMBAT AREA"), FLinearColor(1.f, 0.5f, 0.03f));
+
+	// One yellow capture-area outline per placed objective. It follows each anchor,
+	// so later multiple sectors are labelled automatically without hard-coded maps.
+	for (TActorIterator<ABattleSectorAnchor> It(GetWorld()); It; ++It)
+	{
+		ABattleSectorAnchor* Anchor = *It;
+		if (!Anchor)
+		{
+			continue;
+		}
+		const FString Label = FString::Printf(TEXT("SECTOR %d OBJECTIVE"), Anchor->SectorIndex + 1);
+		const FName Name(*FString::Printf(TEXT("Spline_Sector_%d"), Anchor->SectorIndex + 1));
+		SpawnArea(Name, Anchor->GetActorLocation(), FVector2D(950.f, 950.f), Label, FLinearColor(1.f, 0.88f, 0.04f));
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("V2 Spline regions: spawned %d layout boundary(s) (base/combat/objective)"), GameplayAreaSplines.Num());
+}
+
 APawn* AGameMode_Breakthrough::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
 {
 	if (!NewPlayer)
@@ -229,10 +292,17 @@ void AGameMode_Breakthrough::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// Defer the AI-defender decision by 1.5s: in 2-player PIE both humans join within
-	// a fraction of a second, so after a short delay GetNumPlayers() tells us reliably
-	// whether this is single-player (spawn AI defender) or multiplayer (skip AI, the
-	// 2nd human is the defender). Only arm the timer once.
+	// Packaged local 2P starts the client a few seconds after the listen host. If the
+	// solo placeholder already appeared, remove it immediately once player #2 arrives.
+	if (GetNumPlayers() >= 2)
+	{
+		RemoveSoloDefenderAI();
+		bDefenderAISpawned = true;
+		return;
+	}
+
+	// Give the packaged host enough time for the local client launcher to connect.
+	// PIE joins faster, but this 5-second grace period prevents a stray AI in either.
 	if (bDefenderAISpawned || bAISpawnTimerArmed)
 	{
 		return;
@@ -240,7 +310,30 @@ void AGameMode_Breakthrough::PostLogin(APlayerController* NewPlayer)
 	bAISpawnTimerArmed = true;
 
 	FTimerHandle TimerHandle;
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &AGameMode_Breakthrough::TrySpawnDefenderAI, 1.5f, false);
+	GetWorldTimerManager().SetTimer(TimerHandle, this, &AGameMode_Breakthrough::TrySpawnDefenderAI, 5.f, false);
+}
+
+void AGameMode_Breakthrough::RemoveSoloDefenderAI()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	int32 RemovedCount = 0;
+	for (TActorIterator<ABreakthroughCharacter> It(GetWorld()); It; ++It)
+	{
+		ABreakthroughCharacter* Character = *It;
+		if (Character && Character->Team == 1 && !Character->IsPlayerControlled())
+		{
+			Character->Destroy();
+			++RemovedCount;
+		}
+	}
+	if (RemovedCount > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Local multiplayer: removed %d solo defender AI placeholder(s)"), RemovedCount);
+	}
 }
 
 void AGameMode_Breakthrough::TrySpawnDefenderAI()

@@ -15,6 +15,12 @@ void ABattleGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(ABattleGameState, AttackerScore);
 	DOREPLIFETIME(ABattleGameState, DefenderScore);
 	DOREPLIFETIME(ABattleGameState, bConquestOver);
+	DOREPLIFETIME(ABattleGameState, RemainingMatchSeconds);
+	DOREPLIFETIME(ABattleGameState, ConquestWinner);
+	DOREPLIFETIME(ABattleGameState, CurrentRound);
+	DOREPLIFETIME(ABattleGameState, TotalRounds);
+	DOREPLIFETIME(ABattleGameState, LastRoundAtkGain);
+	DOREPLIFETIME(ABattleGameState, LastRoundDefGain);
 }
 
 void ABattleGameState::AddScore(int32 Team, int32 Amount)
@@ -37,10 +43,6 @@ void ABattleGameState::AddScore(int32 Team, int32 Amount)
 
 void ABattleGameState::OnRep_Scores()
 {
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(9100, 1.2f, FColor::White,
-			FString::Printf(TEXT("CONQUEST  ATTACK %d  :  %d DEFEND"), AttackerScore, DefenderScore),
-			true, FVector2D(1.35f, 1.35f));
-	}
+	// Intentionally empty: scores render through ABattleHUD::DrawHUD now. The OnRep
+	// hook stays so blueprints can still bind score-change side effects if needed.
 }
