@@ -25,6 +25,8 @@ private:
     TSharedPtr<FJsonObject> HandleGetActorProperties(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetActorProperty(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetActorSkeletalMesh(const TSharedPtr<FJsonObject>& Params);
+    // Configure and save the current map's WorldSettings GameMode override.
+    TSharedPtr<FJsonObject> HandleSetWorldGameMode(const TSharedPtr<FJsonObject>& Params);
 
     // Level management commands
     TSharedPtr<FJsonObject> HandleSaveLevel(const TSharedPtr<FJsonObject>& Params);

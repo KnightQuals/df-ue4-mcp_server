@@ -99,7 +99,16 @@ void UUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
     Port = MCP_SERVER_PORT;
     FIPv4Address::Parse(MCP_SERVER_HOST, ServerAddress);
 
-    // Start the server automatically
+    // Commandlets run headlessly and may mutate packages; they never need a live
+    // TCP MCP listener. Starting the listener during EditorEngine initialization can
+    // stall a commandlet before its Main() executes, so keep it editor-session only.
+    if (IsRunningCommandlet())
+    {
+        UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: commandlet mode; TCP server disabled"));
+        return;
+    }
+
+    // Start the server automatically for normal editor sessions.
     StartServer();
 }
 
@@ -239,6 +248,7 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("set_actor_transform") ||
                      CommandType == TEXT("get_actor_properties") ||
                      CommandType == TEXT("set_actor_property") ||
+                     CommandType == TEXT("set_world_game_mode") ||
                      CommandType == TEXT("set_actor_skeletal_mesh") ||
                      CommandType == TEXT("spawn_blueprint_actor") ||
                      CommandType == TEXT("focus_viewport") ||
