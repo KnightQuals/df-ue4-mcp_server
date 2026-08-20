@@ -272,13 +272,18 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 		return;
 	}
 
-	// V2 capture rule — NUMBER-ADVANTAGE based:
+	// V2 capture rule — NUMBER-ADVANTAGE based (regression fix 2026-08-18, user report):
 	//   attackers outnumber defenders -> progress up
 	//   defenders outnumber attackers -> progress down
-	//   equal numbers (including both present "contested", or empty) -> PAUSED
+	//   equal numbers (both present "contested" OR both empty) -> PAUSED
 	// A defender walking in to even the count freezes the countdown until they leave.
-	// Progress is continuous (CaptureSpeed/s), so captures take visible time and never
-	// "snap" instantly when a defender steps out.
+	// An empty zone does NOT regress anymore: in Conquest with two simultaneously
+	// active sectors, the player can only physically stand in one zone, so the
+	// old "abandoned → decay to defender" rule let a previously captured point
+	// silently flip back even though no defender was anywhere near it. Defenders
+	// must now actively enter the zone to recapture. Progress is continuous
+	// (CaptureSpeed/s), so captures take visible time and never "snap" instantly
+	// when a defender steps out.
 	const int32 Advantage = AttackersInZone - DefendersInZone;
 	if (Advantage > 0)
 	{
@@ -309,7 +314,7 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			CaptureProgress = -1.f;
 			if (OwningTeam != 1)
 			{
-				OwningTeam = 1; // held by defenders
+				OwningTeam = 1; // reclaimed by defenders
 				bResetSilently = false; // a real reclaim re-enables announcements
 				UE_LOG(LogTemp, Warning, TEXT("Sector held by defenders!"));
 				ApplyAnchorColor();
@@ -320,23 +325,7 @@ void ABattleSectorAnchor::Tick(float DeltaTime)
 			UE_LOG(LogTemp, Warning, TEXT("Capture progress %.2f (defenders pushing)"), CaptureProgress);
 		}
 	}
-	// Contested-equal: progress paused. Empty zone: progress REGRESSES back toward
-	// the defender side (-1) — abandoning the point mid-capture loses progress.
-	else if (Advantage == 0 && AttackersInZone == 0 && DefendersInZone == 0)
-	{
-		CaptureProgress -= CaptureSpeed * DeltaTime;
-		if (CaptureProgress <= -1.f)
-		{
-			CaptureProgress = -1.f;
-			if (OwningTeam != 1)
-			{
-				OwningTeam = 1; // reverted to defenders (abandoned)
-				bResetSilently = false;
-				UE_LOG(LogTemp, Warning, TEXT("Sector reverted to defenders (abandoned)!"));
-				ApplyAnchorColor();
-			}
-		}
-	}
+	// (Empty zone no longer regresses — see the comment block above.)
 }
 
 void ABattleSectorAnchor::ApplyAnchorColor()
@@ -427,13 +416,13 @@ void ABattleSectorAnchor::ApplyAnchorColor()
 		FColor AnnounceColor = FColor::White;
 		if (OwningTeam == 0)
 		{
-			Announce = FString::Printf(TEXT(">>> SECTOR CAPTURED BY ATTACKERS! <<<"));
+			Announce = FString::Printf(TEXT(">>> 据点已被进攻方占领！ <<<"));
 			AnnounceColor = FColor(255, 60, 60);
 			bWasCapturedOnce = true;
 		}
 		else if (OwningTeam == 1)
 		{
-			Announce = FString::Printf(TEXT(">>> SECTOR RETAKEN BY DEFENDERS! <<<"));
+			Announce = FString::Printf(TEXT(">>> 据点被防守方夺回！ <<<"));
 			AnnounceColor = FColor(60, 140, 255);
 		}
 		if (GEngine && !Announce.IsEmpty())
