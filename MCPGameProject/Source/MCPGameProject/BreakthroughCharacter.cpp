@@ -210,7 +210,7 @@ void ABreakthroughCharacter::OnRep_ForbiddenTimeRemaining()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(9001, 1.1f, FColor(255, 80, 60),
-			FString::Printf(TEXT("WARNING: FORBIDDEN ZONE - RETURN IN %d"), Seconds), true, FVector2D(1.6f, 1.6f));
+			FString::Printf(TEXT("警告：已进入禁区 - 请在 %d 秒内返回战场"), Seconds), true, FVector2D(1.6f, 1.6f));
 	}
 }
 
@@ -233,7 +233,7 @@ void ABreakthroughCharacter::OnRep_Eliminated()
 	if (bIsEliminated && IsLocallyControlled() && GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage((uint64)-1, 3.f, FColor::Red,
-			TEXT(">>> ELIMINATED: LEFT THE BATTLEFIELD <<<"), true, FVector2D(1.8f, 1.8f));
+			TEXT(">>> 已淘汰：离开战场范围，等待重生 <<<"), true, FVector2D(1.8f, 1.8f));
 	}
 }
 
@@ -342,11 +342,39 @@ void ABreakthroughCharacter::UpdateAreaHint()
 		CurrentArea = TEXT("BATTLEFIELD");
 	}
 
+	// On-screen hints are Chinese; world TextRender labels stay English because the
+	// legacy 3D text path has no CJK glyph fallback. Translate only at display time.
+	FString DisplayArea = CurrentArea;
+	if (CurrentArea == TEXT("ATTACKER BASE"))
+	{
+		DisplayArea = TEXT("进攻方基地");
+	}
+	else if (CurrentArea == TEXT("DEFENDER BASE"))
+	{
+		DisplayArea = TEXT("防守方基地");
+	}
+	else if (CurrentArea == TEXT("COMBAT AREA"))
+	{
+		DisplayArea = TEXT("交战区");
+	}
+	else if (CurrentArea == TEXT("BATTLEFIELD"))
+	{
+		DisplayArea = TEXT("战场");
+	}
+	else if (CurrentArea.StartsWith(TEXT("SECTOR ")))
+	{
+		// "SECTOR N OBJECTIVE" -> "据点 N 区域"
+		const FString Rest = CurrentArea.Mid(7);
+		const int32 SpaceIdx = Rest.Find(TEXT(" "));
+		const FString SectorNo = SpaceIdx > 0 ? Rest.Left(SpaceIdx) : Rest;
+		DisplayArea = FString::Printf(TEXT("据点 %s 区域"), *SectorNo);
+	}
+
 	if (CurrentArea != LastShownArea)
 	{
 		LastShownArea = CurrentArea;
 		GEngine->AddOnScreenDebugMessage((uint64)-2, 3.f, AreaColor,
-			FString::Printf(TEXT("--- %s ---"), *CurrentArea), true, FVector2D(1.2f, 1.2f));
+			FString::Printf(TEXT("── %s ──"), *DisplayArea), true, FVector2D(1.2f, 1.2f));
 	}
 }
 
