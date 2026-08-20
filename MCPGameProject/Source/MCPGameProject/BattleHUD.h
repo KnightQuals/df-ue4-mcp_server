@@ -8,6 +8,7 @@
 
 class ABattleGameState;
 class ABattleSectorAnchor;
+class ABreakthroughCharacter;
 
 // V2 match HUD (user request 2026-08-12): replaces one-shot on-screen debug text
 // with a persistent, canvas-drawn interface.
@@ -15,6 +16,9 @@ class ABattleSectorAnchor;
 //  - Center: winner banner when the match ends.
 //  - Bottom center: tug-of-war capture progress bar while the local player stands
 //    inside an active sector's capture radius.
+//  - Top right: symbolic rotating minimap (user request 2026-08-18) drawn purely on
+//    canvas — safe-area rectangle, region outlines, team dots, sector markers — no
+//    UMG and no SceneCapture.
 // All data comes from replicated properties (GameState + anchors), so every player
 // window renders the same state without client-side simulation.
 UCLASS()
@@ -29,6 +33,7 @@ private:
 	void DrawConquestPanel(ABattleGameState* State);
 	void DrawResultBanner(ABattleGameState* State);
 	void DrawCaptureBar();
+	void DrawMinimap();
 
 	// Returns the active anchor whose capture radius contains the local pawn (nearest wins).
 	ABattleSectorAnchor* FindRelevantAnchor() const;
