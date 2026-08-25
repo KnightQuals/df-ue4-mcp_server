@@ -16,7 +16,7 @@ Windows 交付包（见下文「交付包玩法验证」）。
 ## 本项目与上游的关系
 
 本仓库以开源项目 [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp)（UE5.5）为基线，
-**backport 移植到 UE4.27 + VS2019**（向 大型项目的引擎环境对齐）。
+**backport 移植到 UE4.27 + VS2019**（对齐大型项目的引擎环境）。
 
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
@@ -27,7 +27,7 @@ Windows 交付包（见下文「交付包玩法验证」）。
 |---|---|---|
 | W1 | 6/15–6/20 | 环境搭建：UE4.27 + Rider + VS2019 工具链；跑通官方 C++ Quick Start |
 | W2 | 6/22–6/28 | unreal-mcp backport 启动：Python Server + C++ 插件移植；首批 MCP 接口跑通 |
-| W3 | 7/1–7/7 | 三条链路合体：cli-agent(CLI) 写码 → Build.bat 编译取报错 → UE MCP 建蓝图/Spawn；`compile.sh` + cli-agent 自闭环变色 |
+| W3 | 7/1–7/7 | 三条链路合体：CLI Agent 写码 → Build.bat 编译取报错 → UE MCP 建蓝图/Spawn；`compile.sh` + CLI Agent 自闭环变色 |
 | W4 | 7/10–7/17 | 路 B `orchestrator.py` 一条命令跑通完整闭环；V1 据点/出生点/胜负判定骨架 |
 | W5 | 7/20–7/24 | V1 玩法成型：占点变色（石碑）、材质接口、双人分队雏形 |
 | W6 | 7/27–8/3 | 第一视角、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、XGE 卡死根治、关卡默认地图修复 |
@@ -41,7 +41,7 @@ Windows 交付包（见下文「交付包玩法验证」）。
 
 > 下表「课题要求」= mentor 原始需求；「自研扩展」= 开发中沉淀的新设计。两者现已全部落地。
 
-### 课题原始要求（全部完成，对照 课题 需求文档）
+### 课题原始要求（全部完成，对照课题需求文档）
 
 | 要求 | 实现 |
 |---|---|
@@ -97,7 +97,7 @@ Windows 交付包（见下文「交付包玩法验证」）。
 | 视口 | `focus_viewport` / `take_screenshot` |
 | Editor-only Commandlet | `MCPConfigureMap`（无界面设 GameMode / 关卡快照） |
 
-自动化闭环交付物：`orchestrator.py`（仓库根目录）——一条命令：关 UE → cli-agent+GLM-5.2 写 C++ → 编译（清超长环境变量）→ 报错自修（≤3 轮）→ 起 UE → MCP 建蓝图/Spawn，全程实时输出。
+自动化闭环交付物：`orchestrator.py`（仓库根目录）——一条命令：关 UE → CLI Agent（GLM-5.2）写 C++ → 编译（清超长环境变量）→ 报错自修（≤3 轮）→ 起 UE → MCP 建蓝图/Spawn，全程实时输出。
 
 ## 架构（三块）
 

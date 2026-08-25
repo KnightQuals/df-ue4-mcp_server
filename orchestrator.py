@@ -15,9 +15,9 @@ W3 块③ 路B orchestrator —— 完整无人值守闭环 + 实时显示 cli-a
 import subprocess, socket, time, json, sys, os, re
 
 # ===== 配置 =====
-CLI_AGENT = r"C:\Users\dev\.workbuddy\binaries\node\versions\22.22.2\agent-cli.cmd"
-PROJECT = r"D:\dev\ue4-mcp-port"
-UPROJECT = r"D:\dev\ue4-mcp-port\MCPGameProject\MCPGameProject.uproject"
+CLI_AGENT = os.environ.get("CLI_AGENT_PATH", r"C:\path\to\your\agent-cli.cmd")  # 任意兼容 stream-json 的 CLI Agent
+PROJECT = os.environ.get("MCP_PROJECT_DIR", r"D:\dev\ue4-mcp-port")
+UPROJECT = os.path.join(PROJECT, "MCPGameProject", "MCPGameProject.uproject")
 UE_EXE = r"C:\Program Files\Epic Games\UE_4.27\Engine\Binaries\Win64\UE4Editor.exe"
 SESSION = "00000000-0000-0000-0000-000000000000"  # 7/3 长期对话，保持上下文连贯
 MODEL = "GLM-5.2"
