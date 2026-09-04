@@ -6,7 +6,17 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)](https://www.python.org)
 
 > 实习课题项目。目标：基于 MCP 协议 + LLM，让 AI 自动开发 UE4.27 C++ 游戏，
-> 最终由 AI 自动实现「全面战场 MiniGame」。核心 KPI = 打通「AI 写码 → 编译 → 进引擎建蓝图 → Play」的自动闭环。
+> 先后自动实现「全面战场」（攻防对抗）与「SOL」（搜打撤）两个完整 MiniGame。核心 KPI = 打通「AI 写码 → 编译 → 进引擎建蓝图 → Play」的自动闭环。
+
+本仓库 = **UnrealMCP 插件（UE4.27 backport 版）+ 用该系统自动开发出的两个完整 demo**。插件位于 `MCPGameProject/Plugins/UnrealMCP/`；两个 demo 均已打包为可直接运行的 Windows 交付包（[Releases](https://github.com/KnightQuals/df-ue4-mcp_server/releases)）。
+
+```text
+MCPGameProject/    Demo 1：全面战场 MiniGame（插件宿主工程）
+SOL-MiniGame/      Demo 2：SOL MiniGame（搜打撤，自含插件副本）
+Python/            MCP Server（FastMCP，向 AI 客户端暴露工具）
+orchestrator.py    一键自动闭环脚本
+Release/           交付包说明（二进制包在 GitHub Releases）
+```
 
 ## 本项目与上游的关系
 
@@ -16,76 +26,24 @@
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 开发进度（2026-06-15 ~ 2026-09-04，两个 demo 均已定版交付）
+## Demo 1：全面战场 MiniGame（攻防 + 占领，已定版交付）
 
-| 周 | 日期 | 里程碑 |
-|---|---|---|
-| W1 | 6/15–6/20 | 环境搭建：UE4.27 + Rider + VS2019 工具链；跑通官方 C++ Quick Start |
-| W2 | 6/22–6/28 | unreal-mcp backport 启动：Python Server + C++ 插件移植；首批 MCP 接口跑通 |
-| W3 | 7/1–7/7 | 三条链路合体：CLI Agent 写码 → Build.bat 编译取报错 → MCP 建蓝图/Spawn；报错自修闭环跑通 |
-| W4 | 7/10–7/17 | `orchestrator.py` 一条命令完整闭环；V1 据点/出生点/胜负判定骨架 |
-| W5 | 7/20–7/24 | V1 玩法成型：完整多人占点逻辑（双 SpawnHub 分队 + 守方 AI 补位）、视觉化（Mannequin + 线框 + 悬浮文字）、材质/日志/反射接口拓展 |
-| W6 | 7/27–8/3 | 第一视角（Camera + OwnerNoSee）、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、关卡默认地图修复 |
-| W7 | 8/4–8/11 | **V2 核心玩法全量**：DataTable 配置（Key=MapID）、外围禁区淘汰重生、多据点推进、Conquest 模式、Spline 区域边界、汉化 HUD、符号化俯视小地图 |
-| W8 | 8/12–8/14 | **战场交付定版**：正式 HUD（比分/倒计时/进度条）、三局铃声结算、回合重置、Windows 交付包（单人/双人脚本） |
-| W9 | 8/18–8/20 | HUD 收尾修复（Conquest 空区不回退 + 归属方远程进度条）；**战场 demo 封包验收结项（8/20）**，转向 SOL |
-| W10 | 8/21–8/28 | SOL 立项 + v1 四功能：容器（spawnWeight 随机）、F 开箱（首开决定道具）、双击转移、丢弃 |
-| W11 | 8/31–9/1 | **SOL 联机与第一闭环**：DS 架构实装（服务器权威 + 复制兜底）、3 撤离点（风险收益梯度）、负重减速（数值与动画联动）、8 容器 18 物品三层价值密度、行走/奔跑动画 |
-| W12 | 9/3–9/4 | **SOL 战斗收口 + 定版交付**：拾荒者 NPC（GuardRadius 结构保证出生安全）、hitscan 战斗 + 死亡掉落、对局时限 + 回合重置、Windows 交付包 + GitHub Release（`sol-v1.0`） |
+攻防对抗玩法：攻方从左侧基地出发、守方在右侧基地防守，争夺中央据点——攻下一个解锁下一个，全占即胜；另有 Conquest 占领模式（三局铃声结算）。V1 骨架（据点 / 出生 / 胜负判定）到 V2 全量（配置化、禁区、区域可视化、正式 HUD）均由本系统自动开发完成。
 
-两个 demo 的完整玩法说明分别见下文「V1 玩法代码/玩法验证」（战场）与「已完成：SOL MiniGame」章节。
+| 系统 | 实现 |
+|---|---|
+| 双模式 GameMode | `AGameMode_Breakthrough`（顺序推进）+ `AGameMode_Conquest`（3 局 × 30s 铃声结算；据点稳定保持、空区不回退；己方据点被推进度条远程同步） |
+| 占点模型 | 人数差推进连续模型 [-1, 1]：攻多涨 / 守多退 / 对峙冻结；石碑据点动态变色（红=攻占 / 蓝=守待 / 灰=未解锁）+ 全屏公告 |
+| 多据点推进 | Anchor_1 占领后解锁 Anchor_2，全占攻方胜、超时守方胜 |
+| 外围禁区 | 安全区外 10s 倒计时淘汰 → 3s 按阵营重生；server 裁定 + Replication |
+| 全配置化 | `DT_BattleMapConfig`：对局时长 / 禁区 / 占点速度等全参数化；Spline 五类区域贴地标线（编辑器可拖点改形） |
+| 守方 AI | 纯 C++ 巡逻（无 NavMesh / 行为树）；单人自动补位、双人自动退场 |
+| 第一视角 | 眼高相机 + OwnerNoSee 本体隐藏；Shift 加速（400/800）、空格跳跃 |
+| HUD 与小地图 | 攻红守蓝比分 / 局数 / 倒计时 / 占点拉锯进度条（全中文）；右上角符号化俯视小地图（据点菱形、出生点旗帜、敌我色点、本地玩家方向三角） |
 
-## 自动化闭环（路 B orchestrator）
+**运行验证**：Release [`v0.8-minigame`](https://github.com/KnightQuals/df-ue4-mcp_server/releases/tag/v0.8-minigame)（657MB）解压后 `Play_Solo.bat` 单人（自动补守方 AI）、`Play_Local_2P.bat` 同机双人；编辑器内默认加载 NewMap（WorldSettings 已锁 `BP_GameMode_Conquest`）→ ▶ Play 即进入对局，双人选 Number of Players = 2 + Play As Listen Server。
 
-`orchestrator.py`（仓库根目录）是课题核心交付物——一条命令跑通完整闭环：
-
-```bash
-python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderCamp"
-```
-
-流程：关 UE → CLI Agent（LLM）自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → CLI Agent 用 MCP 建蓝图 + spawn。实时显示 Agent 的思考 / 工具调用 / 结果（stream-json 解析）。
-
-**已解决的坑**：① CLI Agent 的 Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（某个超长配置变量撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
-
-## V1 玩法代码（MCPGameProject/Source/MCPGameProject/）
-
-| 类 | 状态 | 作用 |
-|---|---|---|
-| `ABattleSectorAnchor` | ✅ 已建 + 验收 | 据点：CaptureZone 球体 + Overlap 回调 + Tick 双向占领（-1 守 / 0 中立 / 1 攻）+ 变色（ApplyAnchorColor） |
-| `ABattleCampSector` | ✅ 已建 | 攻方基地（Cube 外形） |
-| `ABattleDefenderCamp` | ✅ 已建 | 守方基地（Cube 外形） |
-| `ABattleSectorBase` | ✅ 胜负判定补全 | 区域容器（持有基地/据点引用 + MatchDuration 倒计时 + bMatchOver + 时间到判攻守胜） |
-| `ASpawnAreaHub` | ✅ 已建（7/16） | 出生点集（TArray SpawnPoints + GetRandomSpawnPoint） |
-| `ABreakthroughCharacter` | ✅ 已建（7/16） | 玩家 Character（Team 阵营 + BeginPlay UE_LOG） |
-| `ADefaultPlayerController` | ✅ 已建（7/16） | 玩家控制器（V1 空实现用引擎默认输入） |
-| `AGameMode_Breakthrough` | ✅ 已建（7/16） | GameMode（找 SpawnHub + 重写 SpawnDefaultPawnFor 调 GetRandomSpawnPoint spawn 玩家 + 分阵营） |
-
-## 架构（三块）
-
-1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），
-   接收命令并调用引擎 API 建蓝图/改参数/spawn。← backport 的主战场。
-2. **Python MCP Server** — `Python/`，基于 FastMCP，向 AI 客户端暴露工具（JSON Schema），把工具调用翻译成 TCP 命令。
-3. **示例工程 MCPGameProject** — UE4.27 空白工程 + 已配置好的插件，用于验证。
-
-## 快速开始（UE4.27）
-
-1. **clone 后下载 AnimStarterPack**（Mannequin mesh + 动画，BreakthroughCharacter 引用）：
-   - 打开 Epic Games Launcher → 商城 → 搜索 `Animation Starter Pack` → 添加到项目 → 选 MCPGameProject
-   - 或手动放到 `MCPGameProject/Content/AnimStarterPack/`（路径要对，C++ 用 `FObjectFinder` 加载 `/Game/AnimStarterPack/UE4_Mannequin/Mesh/SK_Mannequin`）
-2. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
-3. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
-4. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
-5. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
-   `scripts/blueprints/test_create_and_spawn_cube_blueprint.py`。
-
-## V1 玩法验证（MainMap）
-
-1. UE 打开后，Content Browser → Maps → 双击 `MainMap` 加载（已含攻方基地/守方基地/据点/SectorBase/Floor）。
-2. WorldSettings → DefaultGameMode = `BP_GameMode_Breakthrough`（如丢失，用 MCP `set_actor_property` 重设）。
-3. ▶ Play → 攻方玩家在 SpawnHub_Attacker @ [-400,0,100] 出生 → 走到中间 Anchor_1 → 占领（红）。
-4. PostLogin 自动 spawn 守方 AI（Mannequin + Idle 动画）在守方基地。
-
-## 已完成：SOL MiniGame（V1，已封包定版）
+## Demo 2：SOL MiniGame（搜打撤，已定版交付）
 
 > 本系统的第二个产出：UE4.27 C++ 搜打撤（search-and-extract）mini-game。同一套 MCP 工具链跑出第二个完整游戏——证明自动化管线**跨玩法类型可复用**。本节只讲 SOL 独有的设计（服务器权威、属性复制、Canvas HUD 等与战场章节重复的不再展开）。
 
@@ -113,14 +71,14 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 - 联机代码路径与战场完全一致：Server RPC + `HasAuthority()` + 属性复制（不在此重复）
 - **隐私分层**：战场全公开；SOL 背包用 `COND_OwnerOnly`，别人的搜刮别人看不见（搜打撤的"信息不对称"才有战术意义）
-- **多进程真实 UDP 演示**：`SOL-MiniGame-Release/` 下的 `Play_Local_2P.bat` 起 1 个 listen server + 2 个独立 client 进程，真实跨进程通信，不依赖 PIE 内存模拟
+- **多进程真实 UDP 演示**：Release 交付包解压后 `WindowsNoEditor/` 下的 `Play_Local_2P.bat` 起 1 个 listen server + 2 个独立 client 进程，真实跨进程通信，不依赖 PIE 内存模拟
 
 ### Windows 交付包（已封包定版）
 
 - Development 配置，`RunUAT BuildCookRun` + `-compressed`（pak 61MB，整包 228MB）
 - `Play_Solo.bat` / `Play_Local_2P.bat`（纯 ASCII）
 - **封包前体检**：运行时 target 编译过 / cook 验证含动态资产 / 多人实测两个窗口均能加入并交互
-- 包体存放于 GitHub Releases（Git 单文件 100MB 限制，228MB 二进制不能入 Git 历史）
+- 包体存放于 GitHub Release [`sol-v1.0`](https://github.com/KnightQuals/df-ue4-mcp_server/releases/tag/sol-v1.0)（Git 单文件 100MB 限制，228MB 二进制不能入 Git 历史）
 - 包内 `WindowsNoEditor/SOLProject/Saved/Logs/SOLProject.log` 已实证：8 容器 / 3 撤离点 / `Anim load: idle=OK walk=OK jog=OK death=OK` ×4（动态资产 cook 进包验证）
 
 ### 已知限制（被追问时诚实清单）
@@ -129,6 +87,56 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - **NPC 不绕障碍**（开阔地直线移动，无 NavMesh/行为树，与战场同样简化）
 - **击杀信息流只有自己**（全服 feed 需要独立复制事件通道）
 - **动画三档切换无过渡混合**（Idle / Walk / Jog 之间硬切，无 blendspace）
+
+## 自动化闭环（orchestrator.py）
+
+`orchestrator.py`（仓库根目录）是课题核心交付物——一条命令跑通完整闭环：
+
+```bash
+python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderCamp"
+```
+
+流程：关 UE → CLI Agent（LLM）自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → CLI Agent 用 MCP 建蓝图 + spawn。实时显示 Agent 的思考 / 工具调用 / 结果（stream-json 解析）。
+
+**已解决的坑**：① CLI Agent 的 Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（某个超长配置变量撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
+
+## 架构（三块）
+
+1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），
+   接收命令并调用引擎 API 建蓝图/改参数/spawn。← backport 的主战场。
+2. **Python MCP Server** — `Python/`，基于 FastMCP，向 AI 客户端暴露工具（JSON Schema），把工具调用翻译成 TCP 命令。
+3. **Demo 工程** — `MCPGameProject/`（Demo 1：全面战场，插件的宿主与验证环境）；`SOL-MiniGame/`（Demo 2：SOL，自含插件副本）。
+
+## 快速开始（UE4.27）
+
+1. **clone 后下载 AnimStarterPack**（Mannequin mesh + 动画，BreakthroughCharacter 引用）：
+   - 打开 Epic Games Launcher → 商城 → 搜索 `Animation Starter Pack` → 添加到项目 → 选 MCPGameProject
+   - 或手动放到 `MCPGameProject/Content/AnimStarterPack/`（路径要对，C++ 用 `FObjectFinder` 加载 `/Game/AnimStarterPack/UE4_Mannequin/Mesh/SK_Mannequin`）
+2. 用 UE4.27 打开 `MCPGameProject/MCPGameProject.uproject`（首次会编译插件与着色器）。
+3. 确认 `编辑 > 插件` 中 `UnrealMCP` 已启用；输出日志出现 `Server started on 127.0.0.1:55557`。
+4. 起 Python 服务：`cd Python && uv venv && uv pip install -e .`
+5. 验证（保持 UE 开着）：`.venv/Scripts/python scripts/actors/test_cube.py`、
+   `scripts/blueprints/test_create_and_spawn_cube_blueprint.py`。
+6. **SOL demo 工程**独立打开：`SOL-MiniGame/SOLProject.uproject`（插件已内置）。动画复用同一份 AnimStarterPack（放一份到 `SOL-MiniGame/Content/AnimStarterPack/`），环境资产需 KiteDemo（Epic 商城 `Open World Demo Collection` → `SOL-MiniGame/Content/KiteDemo/`）。
+
+## 开发进度（2026-06-15 ~ 2026-09-04，两个 demo 均已定版交付）
+
+| 周 | 日期 | 里程碑 |
+|---|---|---|
+| W1 | 6/15–6/20 | 环境搭建：UE4.27 + Rider + VS2019 工具链；跑通官方 C++ Quick Start |
+| W2 | 6/22–6/28 | unreal-mcp backport 启动：Python Server + C++ 插件移植；首批 MCP 接口跑通 |
+| W3 | 7/1–7/7 | 三条链路合体：CLI Agent 写码 → Build.bat 编译取报错 → MCP 建蓝图/Spawn；报错自修闭环跑通 |
+| W4 | 7/10–7/17 | `orchestrator.py` 一条命令完整闭环；V1 据点/出生点/胜负判定骨架 |
+| W5 | 7/20–7/24 | V1 玩法成型：完整多人占点逻辑（双 SpawnHub 分队 + 守方 AI 补位）、视觉化（Mannequin + 线框 + 悬浮文字）、材质/日志/反射接口拓展 |
+| W6 | 7/27–8/3 | 第一视角（Camera + OwnerNoSee）、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、关卡默认地图修复 |
+| W7 | 8/4–8/11 | **V2 核心玩法全量**：DataTable 配置（Key=MapID）、外围禁区淘汰重生、多据点推进、Conquest 模式、Spline 区域边界、汉化 HUD、符号化俯视小地图 |
+| W8 | 8/12–8/14 | **战场交付定版**：正式 HUD（比分/倒计时/进度条）、三局铃声结算、回合重置、Windows 交付包（单人/双人脚本） |
+| W9 | 8/18–8/20 | HUD 收尾修复（Conquest 空区不回退 + 归属方远程进度条）；**战场 demo 封包验收结项（8/20）**，转向 SOL |
+| W10 | 8/21–8/28 | SOL 立项 + v1 四功能：容器（spawnWeight 随机）、F 开箱（首开决定道具）、双击转移、丢弃 |
+| W11 | 8/31–9/1 | **SOL 联机与第一闭环**：DS 架构实装（服务器权威 + 复制兜底）、3 撤离点（风险收益梯度）、负重减速（数值与动画联动）、8 容器 18 物品三层价值密度、行走/奔跑动画 |
+| W12 | 9/3–9/4 | **SOL 战斗收口 + 定版交付**：拾荒者 NPC（GuardRadius 结构保证出生安全）、hitscan 战斗 + 死亡掉落、对局时限 + 回合重置、Windows 交付包 + GitHub Release（`sol-v1.0`） |
+
+两个 demo 的玩法详情见上文 Demo 1 / Demo 2 章节。
 
 ## 已知环境注意事项（backport 踩坑记录）
 
@@ -156,6 +164,10 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 **部署**
 - 源码版引擎编译 Server target，实现 Dedicated Server 独立进程部署
+
+## License
+
+MIT（继承自上游 [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp)）。
 
 ---
 
