@@ -5,38 +5,35 @@
 [![Toolchain](https://img.shields.io/badge/Toolchain-VS2019%20(MSVC%20v142)-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)](https://www.python.org)
 
-> 腾讯实习课题项目。目标：基于 MCP 协议 + LLM，让 AI 自动开发 UE4.27 C++ 游戏，
+> 实习课题项目。目标：基于 MCP 协议 + LLM，让 AI 自动开发 UE4.27 C++ 游戏，
 > 最终由 AI 自动实现「全面战场 MiniGame」。核心 KPI = 打通「AI 写码 → 编译 → 进引擎建蓝图 → Play」的自动闭环。
 
 ## 本项目与上游的关系
 
 本仓库以开源项目 [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp)（UE5.5）为基线，
-**backport 移植到 UE4.27 + VS2019**（向 DFM 大项目的引擎环境对齐）。
+**backport 移植到 UE4.27 + VS2019**（向大型项目的引擎环境对齐）。
 
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
-## 当前进度（W5，2026-07-24）
+## 开发进度（2026-06-15 ~ 2026-09-04，两个 demo 均已定版交付）
 
-- [x] W4 收尾（详见 2026-07-17 进度条目）
-- [x] **W5 V1 完整多人占点逻辑**（7/24）：
-  - `ASpawnAreaHub` 加 Team UPROPERTY（0=攻方基地/1=守方基地）
-  - `AGameMode_Breakthrough` 改造为双 SpawnHub 模式（AttackerHub + DefenderHub）+ 懒查找兜底
-  - SpawnDefaultPawnFor 按玩家 Team 选对应 SpawnHub spawn
-  - PostLogin 自动 spawn 守方 AI Character（Team=1，站守方基地）—— 单人 Play 模拟多人占点
-  - BattleSectorAnchor 已实现人数比较占领（`AttackersInZone - DefendersInZone` 决定方向）
-- [x] **W5 环境修复**（7/23）：VS2019 重装 + PATH 加 UE 引擎 Binaries + EnhancedInput Binaries（修复 dll 加载 GetLastError=126）
-- [x] **W5 输入修复**（7/23）：BreakthroughCharacter 改回旧版 Input BindAxis + DefaultInput.ini 加 AxisMappings（不依赖 IMC/InputAction 资产）
-- [x] **W5 视觉化提升**（7/24）：
-  - SpawnAreaHub + BattleSectorAnchor 加 BoxComponent 线框（绿/红/蓝）+ TextRenderComponent 悬浮文字
-  - BreakthroughCharacter 加载 UE4_Mannequin + Idle 动画（Animation Starter Pack）
-  - Floor Scale=10（10000×10000 大平台）+ CaptureRadius 300→800（占领区域扩大）
-  - 文字/Mannequin BeginPlay 按位置自动旋转朝场景中心
-- [x] **W5 MCP 接口拓展**：`set_actor_skeletal_mesh`（让用户前端选 SkeletalMesh 资产设给 Character）
-- [ ] **W6 已知问题**：第一视角角色模型遮挡视野 → Camera + SpringArm 改造或 PlayerController 第一/第三人称切换
-- [ ] **W7+ V2 详细设计**（iWiki 4019862612 全面战场 V2）：DataTable / Spline / 安全区 / GameMode 两种 / 多人同步
+| 周 | 日期 | 里程碑 |
+|---|---|---|
+| W1 | 6/15–6/20 | 环境搭建：UE4.27 + Rider + VS2019 工具链；跑通官方 C++ Quick Start |
+| W2 | 6/22–6/28 | unreal-mcp backport 启动：Python Server + C++ 插件移植；首批 MCP 接口跑通 |
+| W3 | 7/1–7/7 | 三条链路合体：CLI Agent 写码 → Build.bat 编译取报错 → MCP 建蓝图/Spawn；报错自修闭环跑通 |
+| W4 | 7/10–7/17 | `orchestrator.py` 一条命令完整闭环；V1 据点/出生点/胜负判定骨架 |
+| W5 | 7/20–7/24 | V1 玩法成型：完整多人占点逻辑（双 SpawnHub 分队 + 守方 AI 补位）、视觉化（Mannequin + 线框 + 悬浮文字）、材质/日志/反射接口拓展 |
+| W6 | 7/27–8/3 | 第一视角（Camera + OwnerNoSee）、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、关卡默认地图修复 |
+| W7 | 8/4–8/11 | **V2 核心玩法全量**：DataTable 配置（Key=MapID）、外围禁区淘汰重生、多据点推进、Conquest 模式、Spline 区域边界、汉化 HUD、符号化俯视小地图 |
+| W8 | 8/12–8/14 | **战场交付定版**：正式 HUD（比分/倒计时/进度条）、三局铃声结算、回合重置、Windows 交付包（单人/双人脚本） |
+| W9 | 8/18–8/20 | HUD 收尾修复（Conquest 空区不回退 + 归属方远程进度条）；**战场 demo 封包验收结项（8/20）**，转向 SOL |
+| W10 | 8/21–8/28 | SOL 立项 + v1 四功能：容器（spawnWeight 随机）、F 开箱（首开决定道具）、双击转移、丢弃 |
+| W11 | 8/31–9/1 | **SOL 联机与第一闭环**：DS 架构实装（服务器权威 + 复制兜底）、3 撤离点（风险收益梯度）、负重减速（数值与动画联动）、8 容器 18 物品三层价值密度、行走/奔跑动画 |
+| W12 | 9/3–9/4 | **SOL 战斗收口 + 定版交付**：拾荒者 NPC（GuardRadius 结构保证出生安全）、hitscan 战斗 + 死亡掉落、对局时限 + 回合重置、Windows 交付包 + GitHub Release（`sol-v1.0`） |
 
-详细按天记录见 `worklog/`。
+两个 demo 的完整玩法说明分别见下文「V1 玩法代码/玩法验证」（战场）与「已完成：SOL MiniGame」章节。
 
 ## 自动化闭环（路 B orchestrator）
 
@@ -46,9 +43,9 @@
 python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderCamp"
 ```
 
-流程：关 UE → tclaude + GLM-5.2 自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → tclaude 用 MCP 建蓝图 + spawn。实时显示 tclaude 的思考 / 工具调用 / 结果（stream-json 解析）。
+流程：关 UE → CLI Agent（LLM）自主写 C++ → 编译（删超长环境变量避免环境块超长）→ 报错自修循环（最多 3 轮）→ 起 UE + 等 55557 → CLI Agent 用 MCP 建蓝图 + spawn。实时显示 Agent 的思考 / 工具调用 / 结果（stream-json 解析）。
 
-**已解决的坑**：① tclaude Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（ACC_PRODUCT_CONFIG_V3 34 万字符撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
+**已解决的坑**：① CLI Agent 的 Bash 工具起 UE 后台不生效卡死 → 起 UE 移到外层脚本；② UE 编译环境块超长（某个超长配置变量撑爆 65535 限制）→ 编译时 env 删 >1000 字符变量。
 
 ## V1 玩法代码（MCPGameProject/Source/MCPGameProject/）
 
@@ -65,35 +62,23 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 
 ## 未来计划（Roadmap）
 
-### V1 待补（玩法完整度）
-- [x] **出生点 `ASpawnAreaHub`**（7/16 完成）：TArray SpawnPoints + GetRandomSpawnPoint
-- [x] **胜负判定**（7/16 完成）：ABattleSectorBase Tick 倒计时 + bMatchOver + 时间到判攻守胜
-- [x] **材质变色**（7/15 完成）：MCP 材质接口（create_material/add_vector_parameter/set_material_on_component）让 AI 自主建材质，用户 Play 确认据点变色
-- [ ] **V1 Play 完整验证**：补 Character 输入映射（InputMappingContext）+ Play 跑通玩家在 SpawnHub 出生 + 占领据点变色 + 胜负判定完整流程
-- [ ] **对局时间配置**（V1 简化版可用 C++ `UPROPERTY`，V2 用 DataTable）
+> 两个 demo 已定版交付、代码冻结。以下为候选方向（行业惯例记录，非承诺）。
 
-### V2 详细设计（iWiki 4019862612 全面战场 V2）
-- [ ] **DataTable 配置**（Key=MapID）：每行存对局时间 / 禁区倒计时 / 据点位置 / 阵营初始归属，用 DataTable 替代硬编码
-- [ ] **Spline 区域范围**：用 `USplineComponent` 制作基地 / 据点 / 交战区边界（替代 USphereComponent）
-- [ ] **安全区 / 禁区机制**：我方基地 / 据点区 = 安全区；敌方基地 / 外围 = 禁区，玩家进禁区 10s 倒计时后死亡
-- [ ] **GameMode 两种**：`AGameMode_Breakthrough`（攻防模式）+ `AGameMode_Conquest`（占领模式），共享 `AGameState` / `ADefaultPlayerController` / `ABreakthroughCharacter` / `ABattleFieldPlayerState`
-- [ ] **多人同步 Replication / RPC**：`UPROPERTY(Replicated)` + Server/Client RPC，让阵营归属 / 占领进度在多客户端同步（V2 核心难点）
+**工具链（UnrealMCP 接口）**
+- 资产接口扩展：`create_asset` / `import_texture` / `set_default_material` 等 Content Browser 级操作
+- 对局流程接口：`start_match` 等完整 GameMode 生命周期控制
+- 蓝图节点图操作增强（当前已支持事件/函数/变量节点与连线，可进一步覆盖常用节点类型）
 
-### MCP 接口拓展（L2 自动化系统扩展）
-**策略**：边编译做游戏边拓展接口边界增强 MCP 能力（用户定调）。三次验证成功。
-- [x] **材质接口**（7/15 完成）：`UnrealMCPMaterialCommands`（create_material / add_vector_parameter / set_material_on_component）+ Python material_tools.py
-- [x] **FClassProperty 分支**（7/17 完成）：`set_actor_property` 支持 UClass* 引用（设 GameMode 等），改 UnrealMCPCommonUtils SetObjectProperty
-- [x] **日志接口**（7/17 完成）：`UnrealMCPDebugCommands`（get_output_log 读 UE 输出日志 + filter 过滤）+ Python debug_tools.py，FILEREAD_AllowWrite 修复 UE 独占写
-- [ ] **资产接口**：`create_asset` / `import_texture` / `set_default_material` 等（Content Browser 操作）
-- [ ] **关卡接口**：`new_level` / `save_level` / `open_level`（自动化关卡操作）
-- [ ] **DataTable 接口**：`create_data_table` / `add_row` / `read_row`（V2 配置）
-- [ ] **get_actor_properties 反射属性**：当前只返回基础 transform，要扩展返回完整反射属性（DefaultGameMode 等）
-- [ ] **GameMode 接口**：`set_game_mode` / `start_match`（V2 流程）
+**自动化验证**
+- 玩法回归 commandlet 化：自动加载地图 + 程序化放置测试玩家 + 断言玩法结果（占领是否翻转 / 撤离是否结算），接入 CI——当前的验证依赖编辑器实测 + 日志分析，人工验收是最贵的测试方式
+- 录制一条命令跑通完整闭环的 Demo 视频
 
-### 收尾
-- [ ] 录 Demo（一条命令跑通完整闭环视频）
-- [ ] 写 iWiki 系统架构文档（mentor 要求）
-- [ ] 整理 GitHub 仓库（README 持续更新）
+**玩法扩展（SOL）**
+- 移动端触控适配：虚拟摇杆 + 拖动视角（服务器权威架构下仅需替换输入采集层，玩法代码零改动）
+- 战斗深度：更多武器类型 / NPC 行为树 / 音效反馈
+
+**部署**
+- 源码版引擎编译 Server target，实现真 Dedicated Server 独立进程部署（Launcher 版引擎限制，`SOLProjectServer.Target.cs` 已留档）
 
 ## 架构（三块）
 
@@ -119,16 +104,6 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 2. WorldSettings → DefaultGameMode = `BP_GameMode_Breakthrough`（如丢失，用 MCP `set_actor_property` 重设）。
 3. ▶ Play → 攻方玩家在 SpawnHub_Attacker @ [-400,0,100] 出生 → 走到中间 Anchor_1 → 占领（红）。
 4. PostLogin 自动 spawn 守方 AI（Mannequin + Idle 动画）在守方基地。
-
-## W6–W12 进度更新（2026-08-01 ~ 2026-09-04）
-
-- [x] **W6 战场 V1 定版 + 交付**（8/14–8/20）：第一视角、守方 AI 巡逻、多人 Replication、KiteDemo 环境接入、Windows 交付包（单人/双人 bat）；**战场 demo 封包验收（8/20）**
-- [x] **W7 战场 V2 核心玩法**（8/4–8/11）：DataTable 配置（Key=MapID）、外围禁区淘汰重生、多据点推进、Conquest 三局铃声结算、Spline 区域边界、汉化 HUD、符号化俯视小地图
-- [x] **W8 联机架构定稿**（8/25–8/28）：V1 监听服务器 → V2 专用服务器（DS）架构评审，Server RPC / 属性复制代码路径定稿
-- [x] **W9 SOL 立项 + V1 四功能**（8/21–8/28）：容器（权重随机）、F 开箱首开决定道具、双击转移、丢弃
-- [x] **W10 SOL 联机与第一闭环**（8/31–9/1）：服务器权威架构实装（容器 PostLoad 兜底复制）、3 撤离点（风险收益梯度）、负重减速（数值与动画联动）、8 容器 18 物品三层价值密度、行走/奔跑动画接入
-- [x] **W11 SOL 战斗收口**（9/3）：拾荒者 NPC（派生自 Character 零重复；GuardRadius 结构保证出生区安全）、hitscan 战斗 + 死亡掉落、对局时限 + 超时结算 + R 键回合重置
-- [x] **W12 SOL 定版封包**（9/3–9/4）：Development 配置 `RunUAT BuildCookRun -compressed`（228MB / SHA256 已留档）、Release 上 GitHub、封包前体检（运行时编译 + cook 验证 + 多人实测）通过
 
 ## 已完成：SOL MiniGame（V1，已封包定版）
 
