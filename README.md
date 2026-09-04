@@ -60,26 +60,6 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 | `ADefaultPlayerController` | ✅ 已建（7/16） | 玩家控制器（V1 空实现用引擎默认输入） |
 | `AGameMode_Breakthrough` | ✅ 已建（7/16） | GameMode（找 SpawnHub + 重写 SpawnDefaultPawnFor 调 GetRandomSpawnPoint spawn 玩家 + 分阵营） |
 
-## 未来计划（Roadmap）
-
-> 两个 demo 已定版交付、代码冻结。以下为候选方向（行业惯例记录，非承诺）。
-
-**工具链（UnrealMCP 接口）**
-- 资产接口扩展：`create_asset` / `import_texture` / `set_default_material` 等 Content Browser 级操作
-- 对局流程接口：`start_match` 等完整 GameMode 生命周期控制
-- 蓝图节点图操作增强（当前已支持事件/函数/变量节点与连线，可进一步覆盖常用节点类型）
-
-**自动化验证**
-- 玩法回归 commandlet 化：自动加载地图 + 程序化放置测试玩家 + 断言玩法结果（占领是否翻转 / 撤离是否结算），接入 CI——当前的验证依赖编辑器实测 + 日志分析，人工验收是最贵的测试方式
-- 录制一条命令跑通完整闭环的 Demo 视频
-
-**玩法扩展（SOL）**
-- 移动端触控适配：虚拟摇杆 + 拖动视角（服务器权威架构下仅需替换输入采集层，玩法代码零改动）
-- 战斗深度：更多武器类型 / NPC 行为树 / 音效反馈
-
-**部署**
-- 源码版引擎编译 Server target，实现真 Dedicated Server 独立进程部署（Launcher 版引擎限制，`SOLProjectServer.Target.cs` 已留档）
-
 ## 架构（三块）
 
 1. **UnrealMCP 插件（C++）** — `MCPGameProject/Plugins/UnrealMCP`，在 UE 内开 TCP server（127.0.0.1:55557），
@@ -156,6 +136,26 @@ python orchestrator.py "任务描述，如：新建守方基地 ABattleDefenderC
 - **XGE / IncrediBuild**：若 IncrediBuild 授权失效，UE4.27 会把着色器派给 XGE 并卡死。
   解决：将 `IncrediBuild/xgConsole.exe` 改名（UE 检测不到即回退本地编译）。
 - **命名铁律**：项目名/路径/类名全程纯英文+数字（中文路径会导致 UnrealHeaderTool 乱码）。
+
+## 未来计划
+
+> 两个 demo 已定版交付，代码冻结。以下为候选方向。
+
+**工具链**
+- 资产接口扩展：`create_asset` / `import_texture` / `set_default_material` 等 Content Browser 操作
+- 对局流程接口：`start_match` 等 GameMode 生命周期控制
+- 蓝图节点图操作增强
+
+**自动化验证**
+- 玩法回归 commandlet 化，接入 CI
+- 录制完整闭环 Demo 视频
+
+**玩法扩展（SOL）**
+- 移动端触控适配：虚拟摇杆 + 拖动视角
+- 战斗深度：更多武器类型 / NPC 行为树 / 音效反馈
+
+**部署**
+- 源码版引擎编译 Server target，实现 Dedicated Server 独立进程部署
 
 ---
 
