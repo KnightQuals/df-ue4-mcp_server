@@ -172,12 +172,19 @@ UNREAL/SOURCE/
 
 # 大型外部资源包(Epic Vault下载,不入库,参考AnimStarterPack处理方式)
 MCPGameProject/Content/KiteDemo/
+SOL-MiniGame/Content/KiteDemo/
+
+# Epic Marketplace assets (download separately via Epic Games Launcher)
+MCPGameProject/Content/AnimStarterPack/
+SOL-MiniGame/Content/AnimStarterPack/
 
 # 关卡备份(工作区外备份目录)
 MAP/
 
-# 编译日志
-build*.log
-
-# 交付包二进制(走GitHub Releases发布,不入Git历史)
-Release/*.zip
+# SOL MiniGame - 编辑器运行产物
+SOL-MiniGame/Saved/
+SOL-MiniGame/Binaries/
+SOL-MiniGame/Intermediate/
+SOL-MiniGame/Build/
+SOL-MiniGame/DerivedDataCache/
+SOL-MiniGame/.vs/
