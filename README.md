@@ -26,6 +26,45 @@ Release/           交付包说明（二进制包在 GitHub Releases）
 - `main` 分支：UE5.5 原版留底（原生跑通的参照系）
 - `port/ue4.27` 分支：**移植到 UE4.27 的主力版本**（本分支）
 
+## UnrealMCP 插件（工具链核心：backport + 自研接口扩展）
+
+**没有现成的 UE4 MCP Server——要让 AI 开发 UE 游戏，先得让 AI 能"摸到"引擎。**插件在 UE 编辑器内启动 TCP server（127.0.0.1:55557），接收 JSON 命令并调用引擎 API：建蓝图、改参数、spawn Actor、读写 DataTable、读输出日志。它是整个系统的"执行手"——两个 demo 的全部玩法资产（关卡摆放、蓝图、材质、配置表）都经它程序化生成，零手工摆放。
+
+### Backport：UE5.5 → UE4.27 + VS2019
+
+上游基于 UE5.5；课题目标环境是 UE4.27 + VS2019（MSVC v142）。移植历经 **6 处 C++ 修复**才编译通过（产物 `UE4Editor-UnrealMCP.dll`），代表性修复：
+
+- **editor-only 代码隔离**：引用 UnrealEd / ObjectTools 的代码必须 `#if WITH_EDITOR` 包裹并提供运行态 stub，否则打包运行时 target 直接编译失败
+- **日志独占写**：`get_output_log` 读 UE 输出日志需 `FILEREAD_AllowWrite`（UE 以独占写方式打开日志文件，默认读不了）
+- **DataTable 落盘**：`add_row` 用 `UPackage::SavePackage` 直存；会话内保存状态可能被污染，偶发失败时重开编辑器会话重试即好
+- **关卡复制**：`duplicate_level` 基于 `ObjectTools::DuplicateSingleObject` 生成独立 Asset ID（raw copy `.umap` 会 PrimaryAssetID 重复报警）
+
+### 接口能力清单（backport 后全部实测可用）
+
+| 分组 | 接口 |
+|---|---|
+| Actor 操作 | `spawn_actor`（含 `mesh_path` 程序化摆放 + 重名防崩）/ `delete_actor` / `set_actor_transform` / `find_actors_by_name` / `get_actors_in_level` / `set_actor_skeletal_mesh` / `spawn_blueprint_actor` |
+| 属性与反射 | `get_actor_properties`（TFieldIterator 全量 UPROPERTY）/ `set_actor_property`（含 UClass* 引用分支） |
+| 蓝图 | `create_blueprint` / `add_component_to_blueprint` / `set_component_property` / `compile_blueprint` / `set_blueprint_property` / `set_physics_properties` / 节点图操作（add_event / function / variable、connect 等） |
+| 材质 | `create_material` / `add_vector_parameter` / `set_material_on_component` |
+| 关卡管理 | `save_level` / `new_level` / `open_level` / `duplicate_level`（独立 Map Asset ID；活跃关卡崩溃已修为受控报错） |
+| DataTable | `create_data_table` / `add_row`（含保存落盘修复）/ `read_row` |
+| 工程与日志 | `create_input_mapping` / `get_output_log`（读 UE 输出日志 + 过滤） |
+| 视口 | `focus_viewport` / `take_screenshot` |
+| Editor-only Commandlet | `MCPConfigureMap`（无界面设 GameMode / 关卡快照） |
+
+### 接口扩展策略：需求驱动
+
+接口不是一次性设计出来的，而是**边做游戏边扩边界**——每个玩法需求发现 MCP 够不着的地方，就是下一个接口的出生地：
+
+- 据点要变色 → 材质三件套（`create_material` / `add_vector_parameter` / `set_material_on_component`）
+- 角色要挂 Mannequin 骨架 → `set_actor_skeletal_mesh`；GameMode 要程序化设置 → `set_actor_property` 的 UClass* 引用分支
+- 运行时查错（"这 Actor 为什么没生效"）→ `get_output_log` + `get_actor_properties`（TFieldIterator 反射全量 UPROPERTY）
+- V2 对局要配置化 → DataTable 三件套；无人值守闭环要操作关卡 → `save_level` / `new_level` / `open_level` / `duplicate_level`
+- 打包后无界面环境 → `MCPConfigureMap` commandlet
+
+每个接口都在真实需求里验证过，不是纸面清单——**接口清单的增长轨迹，本身就是两个 demo 的开发历程**。
+
 ## Demo 1：全面战场 MiniGame（攻防 + 占领，已定版交付）
 
 攻防对抗玩法：攻方从左侧基地出发、守方在右侧基地防守，争夺中央据点——攻下一个解锁下一个，全占即胜；另有 Conquest 占领模式（三局铃声结算）。V1 骨架（据点 / 出生 / 胜负判定）到 V2 全量（配置化、禁区、区域可视化、正式 HUD）均由本系统自动开发完成。
